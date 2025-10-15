@@ -573,6 +573,9 @@ async function generateHtml(
             padding: 10px;
             border-bottom: 1px solid #ddd;
         }
+        tr.month-end td {
+            border-bottom: 3px solid #fbcb44;
+        }
         tr:hover {
             background-color: #f5f5f5;
         }
@@ -779,7 +782,22 @@ async function generateHtml(
 `;
 
   // Add game rows
-  sortedGames.forEach((game) => {
+  sortedGames.forEach((game, index) => {
+    // Determine if this is the last game of its month
+    let isMonthEnd = false;
+    if (index < sortedGames.length - 1) {
+      const currentDate = parseDateForSorting(game.date);
+      const nextDate = parseDateForSorting(sortedGames[index + 1].date);
+
+      // Check if month changes between this game and the next
+      if (currentDate.getMonth() !== nextDate.getMonth() ||
+          currentDate.getFullYear() !== nextDate.getFullYear()) {
+        isMonthEnd = true;
+      }
+    } else {
+      // Last game in the list is always a month end
+      isMonthEnd = true;
+    }
     // Format date to be more concise (e.g., "Sat, 10/18/25")
     let displayDate = game.date || "TBD";
     try {
@@ -832,7 +850,8 @@ async function generateHtml(
       locationHtml = locationDisplay.abbr;
     }
 
-    html += `            <tr class="game-row" data-team="${game.team}">
+    const monthEndClass = isMonthEnd ? " month-end" : "";
+    html += `            <tr class="game-row${monthEndClass}" data-team="${game.team}">
                 <td><span class="team-badge" style="background-color: ${teamColor}; color: ${textColor};${borderStyle}">${game.team}</span></td>
                 <td>${displayDate}</td>
                 <td>${displayTime}</td>
