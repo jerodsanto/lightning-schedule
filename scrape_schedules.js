@@ -9,9 +9,40 @@ const cheerio = require("cheerio");
 const fs = require("fs").promises;
 const path = require("path");
 
+// Google Sheet ID for additional games
+const GOOGLE_SHEET_ID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ";
+const GOOGLE_SHEET_CSV_URL = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEET_ID}/export?format=csv`;
+
+// Location abbreviations
+// Maps base location names (without court/gym) to shorter versions
+const LOCATION_ABBREVIATIONS = {
+  "UBT South Sports Complex (Attack-Elite)": "UBT South",
+  "Trinity Classical Academy": "TCA",
+  "Elkhorn North Ridge Middle School": "ENRMS",
+  "Elkhorn Valley View Middle School": "Valley View",
+  "Elkhorn Ridge Middle School": "ERMS",
+  "Elkhorn Middle School": "Elkhorn Middle",
+  "Elkhorn Grandview Middle School": "Grandview Middle",
+  "EPS Woodbrook Elementary": "Woodbrook",
+  "EPS West Dodge Station Elementary": "West Dodge Station",
+  "EPS Arbor View Elementary": "Arbor View",
+  "Nebraska Basketball Academy": "Nebraska Basketball Academy",
+  "Iowa West Fieldhouse": "",
+};
+
 // Team URLs - Add more teams here
 // Format: displayName: { url: "...", htmlName: "exact name as it appears in the HTML", color: "#RRGGBB" }
 const TEAM_URLS = {
+  Varsity: {
+    url: null, // No URL - only from Google Sheet
+    htmlName: null,
+    color: "#8B0000", // Dark red
+  },
+  JV: {
+    url: null, // No URL - only from Google Sheet
+    htmlName: null,
+    color: "#006400", // Dark green
+  },
   "14U Gold": {
     url: "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
     htmlName: "Omaha Lightning Gold 8th",
@@ -37,8 +68,117 @@ const TEAM_URLS = {
     htmlName: "Omaha Lightning Black 3rd",
     color: "black",
   },
-  // "Display Name": { url: "URL", htmlName: "Exact HTML Name", color: "#RRGGBB" },
 };
+
+/**
+ * Default team color for teams not in TEAM_URLS
+ */
+const DEFAULT_TEAM_COLOR = "#2196F3";
+
+/**
+ * Get team color from TEAM_URLS or return default
+ */
+function getTeamColor(teamName) {
+  const teamEntry = Object.entries(TEAM_URLS).find(
+    ([displayName]) => displayName === teamName,
+  );
+  return teamEntry ? teamEntry[1].color : DEFAULT_TEAM_COLOR;
+}
+
+/**
+ * Parse CSV data from Google Sheets
+ */
+async function fetchGoogleSheetGames() {
+  console.log("Fetching additional games from Google Sheet...");
+
+  try {
+    const response = await axios.get(GOOGLE_SHEET_CSV_URL, { timeout: 10000 });
+    const csvData = response.data;
+    const lines = csvData.split("\n");
+    const games = [];
+
+    // Skip header row (index 0) and parse data rows
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      // Parse CSV line - handle quoted fields
+      const fields = [];
+      let currentField = "";
+      let inQuotes = false;
+
+      for (let j = 0; j < line.length; j++) {
+        const char = line[j];
+
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === "," && !inQuotes) {
+          fields.push(currentField.trim());
+          currentField = "";
+        } else {
+          currentField += char;
+        }
+      }
+      fields.push(currentField.trim()); // Add last field
+
+      // Expected columns: Team, Date, Time, Location, Jersey, Opponent, Score
+      if (fields.length >= 6) {
+        const [team, date, time, location, jersey, opponent, score = ""] =
+          fields;
+
+        // Skip rows with missing critical data
+        if (!team || !date || !opponent) continue;
+
+        // Determine home/away from jersey field
+        let homeAway = "";
+        if (
+          jersey.toLowerCase().includes("home") ||
+          jersey.toLowerCase().includes("light")
+        ) {
+          homeAway = "Home";
+        } else if (
+          jersey.toLowerCase().includes("away") ||
+          jersey.toLowerCase().includes("dark")
+        ) {
+          homeAway = "Away";
+        }
+
+        // Parse date to standard format (expecting MM/DD/YYYY or similar)
+        let formattedDate = date;
+        try {
+          const dateObj = new Date(date);
+          if (!isNaN(dateObj.getTime())) {
+            formattedDate = dateObj.toLocaleDateString("en-US", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            });
+          }
+        } catch (e) {
+          // Keep original date if parsing fails
+        }
+
+        games.push({
+          team: team,
+          date: formattedDate,
+          time: time || "TBD",
+          location: location || "TBD",
+          opponent: opponent,
+          homeAway: homeAway,
+          score: score || "-",
+          color: getTeamColor(team),
+        });
+      }
+    }
+
+    console.log(`Found ${games.length} games in Google Sheet`);
+    return games;
+  } catch (error) {
+    console.error("Error fetching Google Sheet:", error.message);
+    return [];
+  }
+}
 
 /**
  * Scrape schedule data for a single team
@@ -187,12 +327,110 @@ function parseTimeToMinutes(timeStr) {
 }
 
 /**
+ * Format time to remove unnecessary :00
+ * Examples: "4:00 PM" -> "4PM", "9:30 AM" -> "9:30AM"
+ */
+function formatTime(timeStr) {
+  if (!timeStr || timeStr === "TBD") return timeStr;
+
+  // Match time pattern like "4:00 PM" or "9:30 AM"
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (match) {
+    const hours = match[1];
+    const minutes = match[2];
+    const ampm = match[3].toUpperCase();
+
+    // If minutes are 00, omit them
+    if (minutes === "00") {
+      return `${hours}${ampm}`;
+    } else {
+      return `${hours}:${minutes}${ampm}`;
+    }
+  }
+
+  return timeStr;
+}
+
+/**
+ * Get abbreviated location with full name for tooltip
+ * Separates court/gym info and displays in parentheses
+ * Returns object with abbr, courtGym, and tooltipText properties
+ * If abbreviation is blank/empty, returns null for abbr to indicate no tooltip should be shown
+ *
+ * Example: "Elkhorn North Ridge Middle School - Auxiliary Gym"
+ *   -> abbr: "ENRMS", courtGym: "aux gym", tooltipText: "Elkhorn North Ridge Middle School"
+ * Example with blank abbreviation:
+ *   -> abbr: null, courtGym: null, tooltipText: "Full Location - Court Info"
+ */
+function getLocationDisplay(location) {
+  if (!location || location === "TBD") {
+    return { abbr: "TBD", courtGym: null, tooltipText: "TBD" };
+  }
+
+  // Split on hyphen to separate main location from court/gym info
+  const parts = location.split(" - ");
+
+  if (parts.length === 2) {
+    const baseLocation = parts[0].trim();
+    const courtGymInfo = parts[1].trim().toLowerCase();
+
+    // Check if abbreviation exists in the map
+    if (baseLocation in LOCATION_ABBREVIATIONS) {
+      const abbreviated = LOCATION_ABBREVIATIONS[baseLocation];
+
+      // If abbreviation is blank/empty, show full location without tooltip
+      if (!abbreviated || abbreviated.trim() === "") {
+        return {
+          abbr: null,
+          courtGym: null,
+          tooltipText: location,
+        };
+      }
+
+      // Return abbreviated location with separate court/gym info
+      // Tooltip only shows the base location (not court/gym)
+      return {
+        abbr: abbreviated,
+        courtGym: courtGymInfo,
+        tooltipText: baseLocation,
+      };
+    }
+
+    // No abbreviation found in map, but still format with court/gym in parentheses
+    return {
+      abbr: baseLocation,
+      courtGym: courtGymInfo,
+      tooltipText: baseLocation,
+    };
+  }
+
+  // No hyphen separator - check if there's an abbreviation for the whole thing
+  if (location in LOCATION_ABBREVIATIONS) {
+    const abbreviated = LOCATION_ABBREVIATIONS[location];
+
+    // If abbreviation is blank/empty, show full location without tooltip
+    if (!abbreviated || abbreviated.trim() === "") {
+      return { abbr: null, courtGym: null, tooltipText: location };
+    }
+
+    return { abbr: abbreviated, courtGym: null, tooltipText: location };
+  }
+
+  // If no abbreviation exists, use the full name for both
+  return { abbr: location, courtGym: null, tooltipText: location };
+}
+
+/**
  * Generate HTML schedule page
  */
-async function generateHtml(allGames, outputFile = "combined_schedule.html", filterTeam = null) {
+async function generateHtml(
+  allGames,
+  outputFile = "index.html",
+  filterTeam = null,
+) {
   // Filter games if a specific team is requested
   const gamesToDisplay = filterTeam
-    ? allGames.filter(game => game.team === filterTeam)
+    ? allGames.filter((game) => game.team === filterTeam)
     : allGames;
 
   // Sort games by date and time
@@ -209,15 +447,30 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
     return parseTimeToMinutes(a.time) - parseTimeToMinutes(b.time);
   });
 
-  // Get unique teams in the order they appear in TEAM_URLS
+  // Get unique teams in the order they appear in TEAM_URLS, then alphabetically for others
   const teamOrder = Object.keys(TEAM_URLS);
   const teams = [...new Set(allGames.map((game) => game.team))].sort((a, b) => {
-    return teamOrder.indexOf(a) - teamOrder.indexOf(b);
+    const aIndex = teamOrder.indexOf(a);
+    const bIndex = teamOrder.indexOf(b);
+
+    // Both teams are in TEAM_URLS - use their configured order
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+
+    // Only a is in TEAM_URLS - it comes first
+    if (aIndex !== -1) return -1;
+
+    // Only b is in TEAM_URLS - it comes first
+    if (bIndex !== -1) return 1;
+
+    // Neither is in TEAM_URLS - sort alphabetically
+    return a.localeCompare(b);
   });
 
   // Create a map of team names to colors
   const teamColorMap = {};
-  allGames.forEach(game => {
+  allGames.forEach((game) => {
     teamColorMap[game.team] = game.color;
   });
 
@@ -226,7 +479,7 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightning Combined Schedule</title>
+    <title>Omaha Lightning Game Schedule</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -265,7 +518,7 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
         }
         th {
             background-color: #fbcb44;
-            color: white;
+            color: black;
             padding: 12px;
             text-align: left;
         }
@@ -300,12 +553,141 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
             background-color: #FF9800;
             color: white;
         }
+        .location-wrapper {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        .location-abbr {
+            text-decoration: underline;
+            text-decoration-style: dotted;
+            text-decoration-color: #999;
+        }
+        .location-tooltip {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            z-index: 1000;
+            background-color: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: opacity 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .location-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        .location-wrapper:hover .location-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        .location-wrapper.active .location-tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
         @media (max-width: 768px) {
+            body {
+                margin: 10px;
+            }
+            h1 {
+                font-size: 1.5em;
+            }
+            .filter-buttons {
+                margin: 15px 0;
+            }
+            .filter-btn {
+                padding: 6px 10px;
+                font-size: 0.85em;
+                margin: 2px;
+            }
             table {
-                font-size: 0.9em;
+                font-size: 0.7em;
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+            }
+            thead, tbody {
+                display: table;
+                width: 100%;
             }
             th, td {
                 padding: 8px 4px;
+                word-wrap: break-word;
+                white-space: normal;
+            }
+            /* Make team column narrower */
+            th:nth-child(1),
+            td:nth-child(1) {
+                min-width: 60px;
+            }
+            /* Make date column narrower */
+            th:nth-child(2),
+            td:nth-child(2) {
+                min-width: 85px;
+            }
+            /* Make time column narrower */
+            th:nth-child(3),
+            td:nth-child(3) {
+                min-width: 50px;
+            }
+            /* Location needs more space */
+            th:nth-child(4),
+            td:nth-child(4) {
+                min-width: 120px;
+                max-width: 180px;
+            }
+            /* Jersey column */
+            th:nth-child(5),
+            td:nth-child(5) {
+                min-width: 65px;
+            }
+            /* Opponent needs space */
+            th:nth-child(6),
+            td:nth-child(6) {
+                min-width: 100px;
+                max-width: 150px;
+            }
+            /* Score column */
+            th:nth-child(7),
+            td:nth-child(7) {
+                min-width: 40px;
+            }
+            .team-badge {
+                font-size: 0.85em;
+                padding: 3px 5px;
+            }
+        }
+        @media (max-width: 480px) {
+            body {
+                margin: 5px;
+            }
+            table {
+                font-size: 0.65em;
+            }
+            th, td {
+                padding: 6px 3px;
+            }
+            .team-badge {
+                font-size: 0.8em;
+                padding: 2px 4px;
+            }
+            .filter-btn {
+                padding: 5px 8px;
+                font-size: 0.8em;
             }
         }
     </style>
@@ -314,16 +696,22 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
     <h1>⚡️ Lightning Combined Schedule</h1>
     <p style="text-align: center; color: #999; font-size: 0.75rem; margin: -10px 0 20px 0;">Last updated on ${new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })} at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</p>
     <div class="filter-buttons">
-        <a href="${filterTeam ? '../' : './'}" class="filter-btn ${!filterTeam ? 'active' : ''}" style="${!filterTeam ? 'background-color: #fbcb44 !important; color: black !important;' : ''} text-decoration: none; display: inline-block;">All Teams</a>
+        <a href="${filterTeam ? "../" : "./"}" class="filter-btn ${!filterTeam ? "active" : ""}" style="${!filterTeam ? "background-color: #fbcb44 !important; color: black !important;" : ""} text-decoration: none; display: inline-block;">All Teams</a>
 `;
 
   // Add filter buttons for each team with their respective colors
   teams.forEach((team) => {
     const teamColor = teamColorMap[team];
-    const textColor = teamColor === "#FFFFFF" || teamColor === "white" ? "black" : "white";
-    const teamSlug = team.toLowerCase().replace(/\s+/g, '');
-    const activeClass = filterTeam === team ? 'active' : '';
-    const activeStyle = filterTeam === team ? `background-color: ${teamColor} !important; color: ${textColor} !important;` : '';
+    const textColor =
+      teamColor === "#FFFFFF" || teamColor === "white" ? "black" : "white";
+    const borderStyle =
+      teamColor === "#FFFFFF" ? " border: 1px solid black;" : "";
+    const teamSlug = team.toLowerCase().replace(/\s+/g, "");
+    const activeClass = filterTeam === team ? "active" : "";
+    const activeStyle =
+      filterTeam === team
+        ? `background-color: ${teamColor} !important; color: ${textColor} !important;${borderStyle}`
+        : "";
     const teamLink = filterTeam ? `../${teamSlug}/` : `${teamSlug}/`;
     html += `        <a href="${teamLink}" class="filter-btn ${activeClass}" style="${activeStyle} text-decoration: none; display: inline-block;">${team}</a>\n`;
   });
@@ -346,17 +734,16 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
 
   // Add game rows
   sortedGames.forEach((game) => {
-    // Format date to be more concise (e.g., "Sat, Oct 18, 2025")
+    // Format date to be more concise (e.g., "Sat, 10/18/25")
     let displayDate = game.date || "TBD";
     try {
       const dateObj = new Date(game.date);
       if (!isNaN(dateObj.getTime())) {
-        displayDate = dateObj.toLocaleDateString("en-US", {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        });
+        const weekday = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+        const month = dateObj.getMonth() + 1; // 0-indexed
+        const day = dateObj.getDate();
+        const year = dateObj.getFullYear().toString().slice(-2); // Last 2 digits
+        displayDate = `${weekday}, ${month}/${day}/${year}`;
       }
     } catch (e) {
       // Keep original date if parsing fails
@@ -373,12 +760,35 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
     // Get team color
     const teamColor = game.color;
     const textColor = teamColor === "#FFFFFF" ? "#000000" : "#FFFFFF";
+    const borderStyle =
+      teamColor === "#FFFFFF" ? " border: 1px solid black;" : "";
+
+    // Format time
+    const displayTime = formatTime(game.time || "TBD");
+
+    // Get location display
+    const locationDisplay = getLocationDisplay(game.location || "TBD");
+    let locationHtml;
+
+    if (locationDisplay.abbr === null) {
+      // No abbreviation - show full location without tooltip
+      locationHtml = locationDisplay.tooltipText;
+    } else if (locationDisplay.courtGym) {
+      // Has abbreviation and court/gym info - wrap only abbreviation with tooltip
+      locationHtml = `<span class="location-wrapper"><span class="location-abbr">${locationDisplay.abbr}</span><span class="location-tooltip">${locationDisplay.tooltipText}</span></span> (${locationDisplay.courtGym})`;
+    } else if (locationDisplay.abbr !== locationDisplay.tooltipText) {
+      // Has abbreviation but no court/gym - wrap with tooltip
+      locationHtml = `<span class="location-wrapper"><span class="location-abbr">${locationDisplay.abbr}</span><span class="location-tooltip">${locationDisplay.tooltipText}</span></span>`;
+    } else {
+      // Same value for both - no tooltip needed
+      locationHtml = locationDisplay.abbr;
+    }
 
     html += `            <tr class="game-row" data-team="${game.team}">
-                <td><span class="team-badge" style="background-color: ${teamColor}; color: ${textColor};">${game.team}</span></td>
+                <td><span class="team-badge" style="background-color: ${teamColor}; color: ${textColor};${borderStyle}">${game.team}</span></td>
                 <td>${displayDate}</td>
-                <td>${game.time || "TBD"}</td>
-                <td>${game.location || "TBD"}</td>
+                <td>${displayTime}</td>
+                <td>${locationHtml}</td>
                 <td>${jerseyText}</td>
                 <td>${game.opponent || "TBD"}</td>
                 <td>${game.score || "-"}</td>
@@ -388,12 +798,41 @@ async function generateHtml(allGames, outputFile = "combined_schedule.html", fil
 
   html += `        </tbody>
     </table>
+    <script>
+        // Handle tooltip clicks on mobile devices
+        document.addEventListener('DOMContentLoaded', function() {
+            const locationWrappers = document.querySelectorAll('.location-wrapper');
+
+            locationWrappers.forEach(function(wrapper) {
+                wrapper.addEventListener('click', function(e) {
+                    e.stopPropagation();
+
+                    // Close all other open tooltips
+                    locationWrappers.forEach(function(otherWrapper) {
+                        if (otherWrapper !== wrapper) {
+                            otherWrapper.classList.remove('active');
+                        }
+                    });
+
+                    // Toggle this tooltip
+                    wrapper.classList.toggle('active');
+                });
+            });
+
+            // Close tooltips when clicking outside
+            document.addEventListener('click', function() {
+                locationWrappers.forEach(function(wrapper) {
+                    wrapper.classList.remove('active');
+                });
+            });
+        });
+    </script>
 </body>
 </html>
 `;
 
   await fs.writeFile(outputFile, html, "utf-8");
-  console.log(`\nGenerated ${outputFile}`);
+  console.log(`Generated ${outputFile}`);
 }
 
 /**
@@ -404,15 +843,22 @@ async function main() {
 
   const allGames = [];
 
+  // Fetch games from team URLs (skip teams without URLs)
   for (const [displayName, teamInfo] of Object.entries(TEAM_URLS)) {
-    const games = await scrapeTeamSchedule(
-      displayName,
-      teamInfo.url,
-      teamInfo.htmlName,
-      teamInfo.color,
-    );
-    allGames.push(...games);
+    if (teamInfo.url) {
+      const games = await scrapeTeamSchedule(
+        displayName,
+        teamInfo.url,
+        teamInfo.htmlName,
+        teamInfo.color,
+      );
+      allGames.push(...games);
+    }
   }
+
+  // Fetch additional games from Google Sheet
+  const sheetGames = await fetchGoogleSheetGames();
+  allGames.push(...sheetGames);
 
   if (allGames.length === 0) {
     console.log("\nNo games found. Please check the URLs and try again.");
@@ -422,22 +868,24 @@ async function main() {
   console.log(`\nTotal games found: ${allGames.length}`);
 
   // Create dist directory
-  const distDir = path.join(process.cwd(), 'dist');
+  const distDir = path.join(process.cwd(), "dist");
   await fs.mkdir(distDir, { recursive: true });
 
   // Generate combined schedule as index.html in dist
   await generateHtml(allGames, path.join(distDir, "index.html"));
 
   // Generate individual team schedules in subfolders
-  const teams = [...new Set(allGames.map(game => game.team))];
+  const teams = [...new Set(allGames.map((game) => game.team))];
   for (const team of teams) {
-    const teamSlug = team.toLowerCase().replace(/\s+/g, '');
+    const teamSlug = team.toLowerCase().replace(/\s+/g, "");
     const teamDir = path.join(distDir, teamSlug);
     await fs.mkdir(teamDir, { recursive: true });
     await generateHtml(allGames, path.join(teamDir, "index.html"), team);
   }
 
-  console.log("\n✓ Done! Generated dist/index.html and individual team pages in dist/[team]/index.html.");
+  console.log(
+    "\n✓ Done! Generated dist/index.html and individual team pages in dist/[team]/index.html.",
+  );
 }
 
 // Run the script

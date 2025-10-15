@@ -1,11 +1,15 @@
 #!/bin/bash
 
 # Deploy script to upload dist directory to remote server
-# Uploads to mydh host at ~/testing.jerodsanto.net
 
 set -e
 
-echo "📦 Deploying to mydh:~/schedule.omahalightningbasketball.com..."
+# Configuration
+DOMAIN="schedule.omahalightningbasketball.com"
+# DOMAIN="testing.jerodsanto.net"
+REMOTE_HOST="mydh"
+
+echo "📦 Deploying to ${REMOTE_HOST}:~/${DOMAIN}..."
 
 # Check if dist directory exists
 if [ ! -d "dist" ]; then
@@ -14,7 +18,7 @@ if [ ! -d "dist" ]; then
 fi
 
 # Use rsync to upload the dist directory contents
-rsync -avz --delete dist/ mydh:~/schedule.omahalightningbasketball.com/
+rsync -avz --delete dist/ ${REMOTE_HOST}:~/${DOMAIN}/
 
 echo "✅ Deploy complete!"
-echo "🌐 Your site should be available at your configured domain."
+echo "🌐 Your site should be available at https://${DOMAIN}"
