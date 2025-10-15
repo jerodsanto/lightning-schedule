@@ -36,12 +36,12 @@ const TEAM_URLS = {
   Varsity: {
     url: null, // No URL - only from Google Sheet
     htmlName: null,
-    color: "#8B0000", // Dark red
+    color: "#f59c44", // orange
   },
   JV: {
     url: null, // No URL - only from Google Sheet
     htmlName: null,
-    color: "#006400", // Dark green
+    color: "#44a15b", // green
   },
   "14U Gold": {
     url: "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
@@ -56,17 +56,17 @@ const TEAM_URLS = {
   "12U Blue": {
     url: "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263029c941335204c&IDTeam=h20250803221620486ddba884e17c748",
     htmlName: "Omaha Lightning Blue 6th",
-    color: "#2196F3",
+    color: "#5b9de9",
   },
   "10U Red": {
     url: "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263e6b6d69f385c49&IDTeam=h202508032216206132b484a6720f345",
     htmlName: "Omaha Lightning Red 4th",
-    color: "red",
+    color: "#d53a44",
   },
   "10U Black": {
     url: "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263934d14719c5d45&IDTeam=h202508032216205157e930ef2d5314d",
     htmlName: "Omaha Lightning Black 3rd",
-    color: "black",
+    color: "#000000",
   },
 };
 
@@ -83,6 +83,51 @@ function getTeamColor(teamName) {
     ([displayName]) => displayName === teamName,
   );
   return teamEntry ? teamEntry[1].color : DEFAULT_TEAM_COLOR;
+}
+
+/**
+ * Get text color for a team badge based on the background color
+ * Returns white for dark backgrounds, black for light backgrounds
+ * Uses relative luminance calculation (WCAG formula)
+ */
+function getTeamTextColor(backgroundColor) {
+  // Normalize the color to lowercase for comparison
+  const normalizedColor = backgroundColor.toLowerCase();
+
+  // Parse the color to RGB values
+  let r, g, b;
+
+  // Handle hex colors (#RRGGBB or #RGB)
+  if (normalizedColor.startsWith("#")) {
+    const hex = normalizedColor.substring(1);
+    if (hex.length === 6) {
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 4), 16);
+      b = parseInt(hex.substring(4, 6), 16);
+    } else if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    }
+  }
+
+  // Calculate relative luminance using WCAG formula
+  // https://www.w3.org/TR/WCAG20/#relativeluminancedef
+  const rsRGB = r / 255;
+  const gsRGB = g / 255;
+  const bsRGB = b / 255;
+
+  const rLinear =
+    rsRGB <= 0.03928 ? rsRGB / 12.92 : Math.pow((rsRGB + 0.055) / 1.055, 2.4);
+  const gLinear =
+    gsRGB <= 0.03928 ? gsRGB / 12.92 : Math.pow((gsRGB + 0.055) / 1.055, 2.4);
+  const bLinear =
+    bsRGB <= 0.03928 ? bsRGB / 12.92 : Math.pow((bsRGB + 0.055) / 1.055, 2.4);
+
+  const luminance = 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
+
+  // Use white text for dark colors (luminance < 0.5), black text for light colors
+  return luminance < 0.5 ? "white" : "black";
 }
 
 /**
@@ -479,7 +524,7 @@ async function generateHtml(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Omaha Lightning Game Schedule</title>
+    <title>Lightning Game Schedule</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -533,7 +578,7 @@ async function generateHtml(
             display: inline-block;
             padding: 4px 8px;
             background-color: #2196F3;
-            color: white;
+            color: black;
             border-radius: 4px;
             font-size: 0.9em;
         }
@@ -693,7 +738,7 @@ async function generateHtml(
     </style>
 </head>
 <body>
-    <h1>⚡️ Lightning Combined Schedule</h1>
+    <h1>⚡️ Lightning Game Schedule</h1>
     <p style="text-align: center; color: #999; font-size: 0.75rem; margin: -10px 0 20px 0;">Last updated on ${new Date().toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" })} at ${new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })}</p>
     <div class="filter-buttons">
         <a href="${filterTeam ? "../" : "./"}" class="filter-btn ${!filterTeam ? "active" : ""}" style="${!filterTeam ? "background-color: #fbcb44 !important; color: black !important;" : ""} text-decoration: none; display: inline-block;">All Teams</a>
@@ -702,8 +747,7 @@ async function generateHtml(
   // Add filter buttons for each team with their respective colors
   teams.forEach((team) => {
     const teamColor = teamColorMap[team];
-    const textColor =
-      teamColor === "#FFFFFF" || teamColor === "white" ? "black" : "white";
+    const textColor = getTeamTextColor(teamColor);
     const borderStyle =
       teamColor === "#FFFFFF" ? " border: 1px solid black;" : "";
     const teamSlug = team.toLowerCase().replace(/\s+/g, "");
@@ -739,7 +783,9 @@ async function generateHtml(
     try {
       const dateObj = new Date(game.date);
       if (!isNaN(dateObj.getTime())) {
-        const weekday = dateObj.toLocaleDateString("en-US", { weekday: "short" });
+        const weekday = dateObj.toLocaleDateString("en-US", {
+          weekday: "short",
+        });
         const month = dateObj.getMonth() + 1; // 0-indexed
         const day = dateObj.getDate();
         const year = dateObj.getFullYear().toString().slice(-2); // Last 2 digits
@@ -752,14 +798,14 @@ async function generateHtml(
     // Format jersey text
     let jerseyText = "TBD";
     if (game.homeAway === "Home") {
-      jerseyText = "Home (Light)";
+      jerseyText = "⬜️";
     } else if (game.homeAway === "Away") {
-      jerseyText = "Away (Dark)";
+      jerseyText = "⬛️";
     }
 
-    // Get team color
+    // Get team color and text color
     const teamColor = game.color;
-    const textColor = teamColor === "#FFFFFF" ? "#000000" : "#FFFFFF";
+    const textColor = getTeamTextColor(teamColor);
     const borderStyle =
       teamColor === "#FFFFFF" ? " border: 1px solid black;" : "";
 

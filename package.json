@@ -2,9 +2,9 @@
   "name": "lightning-basketball-schedule",
   "version": "1.0.0",
   "description": "Scrapes basketball team schedules and combines them into a single HTML page",
-  "main": "scrape_schedules.js",
+  "main": "generate.js",
   "scripts": {
-    "start": "node scrape_schedules.js",
+    "start": "node generate.js",
     "deploy": "./deploy.sh"
   },
   "keywords": [
