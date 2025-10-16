@@ -684,36 +684,31 @@ async function generateHtml(
             td:nth-child(1) {
                 min-width: 60px;
             }
-            /* Make date column narrower */
+            /* Time column (combined date+time) */
             th:nth-child(2),
             td:nth-child(2) {
-                min-width: 85px;
-            }
-            /* Make time column narrower */
-            th:nth-child(3),
-            td:nth-child(3) {
-                min-width: 50px;
+                min-width: 120px;
             }
             /* Location needs more space */
-            th:nth-child(4),
-            td:nth-child(4) {
+            th:nth-child(3),
+            td:nth-child(3) {
                 min-width: 120px;
                 max-width: 180px;
             }
             /* Jersey column */
-            th:nth-child(5),
-            td:nth-child(5) {
+            th:nth-child(4),
+            td:nth-child(4) {
                 min-width: 65px;
             }
             /* Opponent needs space */
-            th:nth-child(6),
-            td:nth-child(6) {
+            th:nth-child(5),
+            td:nth-child(5) {
                 min-width: 100px;
                 max-width: 150px;
             }
             /* Score column */
-            th:nth-child(7),
-            td:nth-child(7) {
+            th:nth-child(6),
+            td:nth-child(6) {
                 min-width: 40px;
             }
             .team-badge {
@@ -770,7 +765,6 @@ async function generateHtml(
         <thead>
             <tr>
                 <th>Team</th>
-                <th>Date</th>
                 <th>Time</th>
                 <th>Location</th>
                 <th>Jersey</th>
@@ -798,21 +792,28 @@ async function generateHtml(
       // Last game in the list is always a month end
       isMonthEnd = true;
     }
-    // Format date to be more concise (e.g., "Sat, 10/18/25")
-    let displayDate = game.date || "TBD";
+    // Combine date and time in format: "Sat Oct 18 11AM"
+    let displayDateTime = "TBD";
     try {
       const dateObj = new Date(game.date);
       if (!isNaN(dateObj.getTime())) {
         const weekday = dateObj.toLocaleDateString("en-US", {
           weekday: "short",
         });
-        const month = dateObj.getMonth() + 1; // 0-indexed
+        const month = dateObj.toLocaleDateString("en-US", {
+          month: "short",
+        });
         const day = dateObj.getDate();
-        const year = dateObj.getFullYear().toString().slice(-2); // Last 2 digits
-        displayDate = `${weekday}, ${month}/${day}/${year}`;
+        const time = formatTime(game.time || "TBD");
+
+        if (time === "TBD") {
+          displayDateTime = `${weekday} ${month} ${day} TBD`;
+        } else {
+          displayDateTime = `${weekday} ${month} ${day} ${time}`;
+        }
       }
     } catch (e) {
-      // Keep original date if parsing fails
+      // Keep TBD if parsing fails
     }
 
     // Format jersey text
@@ -828,9 +829,6 @@ async function generateHtml(
     const textColor = getTeamTextColor(teamColor);
     const borderStyle =
       teamColor === "#FFFFFF" ? " border: 1px solid black;" : "";
-
-    // Format time
-    const displayTime = formatTime(game.time || "TBD");
 
     // Get location display
     const locationDisplay = getLocationDisplay(game.location || "TBD");
@@ -853,8 +851,7 @@ async function generateHtml(
     const monthEndClass = isMonthEnd ? " month-end" : "";
     html += `            <tr class="game-row${monthEndClass}" data-team="${game.team}">
                 <td><span class="team-badge" style="background-color: ${teamColor}; color: ${textColor};${borderStyle}">${game.team}</span></td>
-                <td>${displayDate}</td>
-                <td>${displayTime}</td>
+                <td>${displayDateTime}</td>
                 <td>${locationHtml}</td>
                 <td>${jerseyText}</td>
                 <td>${game.opponent || "TBD"}</td>

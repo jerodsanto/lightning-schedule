@@ -3,7 +3,8 @@
     "allow": [
       "WebFetch(domain:tourneymachine.com)",
       "WebFetch(domain:docs.google.com)",
-      "Bash(node scrape_schedules.js)"
+      "Bash(node scrape_schedules.js)",
+      "Bash(node generate.js:*)"
     ],
     "deny": [],
     "ask": []
