@@ -934,11 +934,12 @@ async function main() {
 
   console.log(`\nTotal games found: ${allGames.length}`);
 
-  // Create dist directory
-  const distDir = path.join(process.cwd(), "dist");
+  // Get output directory from command line argument or use default "dist"
+  const outputDir = process.argv[2] || "dist";
+  const distDir = path.join(process.cwd(), outputDir);
   await fs.mkdir(distDir, { recursive: true });
 
-  // Generate combined schedule as index.html in dist
+  // Generate combined schedule as index.html in output directory
   await generateHtml(allGames, path.join(distDir, "index.html"));
 
   // Generate individual team schedules in subfolders
@@ -951,7 +952,7 @@ async function main() {
   }
 
   console.log(
-    "\n✓ Done! Generated dist/index.html and individual team pages in dist/[team]/index.html.",
+    `\n✓ Done! Generated ${outputDir}/index.html and individual team pages in ${outputDir}/[team]/index.html.`,
   );
 }
 
