@@ -238,11 +238,27 @@ func fetchGoogleSheetGames() ([]Game, error) {
 		if timeStr == "" {
 			timeStr = "TBD"
 		}
-		if score == "" {
-			score = "-"
-		}
 		if location == "" {
 			location = "TBD"
+		}
+
+		// Parse score and add W/L if score is in format "ourScore-theirScore"
+		// and doesn't already have W/L indicator
+		if score != "" && score != "-" && !strings.Contains(score, "W") && !strings.Contains(score, "L") {
+			scoreParts := strings.Split(score, "-")
+			if len(scoreParts) == 2 {
+				ourScore, err1 := strconv.Atoi(strings.TrimSpace(scoreParts[0]))
+				theirScore, err2 := strconv.Atoi(strings.TrimSpace(scoreParts[1]))
+				if err1 == nil && err2 == nil {
+					if ourScore > theirScore {
+						score = fmt.Sprintf("%d-%d (W)", ourScore, theirScore)
+					} else {
+						score = fmt.Sprintf("%d-%d (L)", ourScore, theirScore)
+					}
+				}
+			}
+		} else if score == "" {
+			score = "-"
 		}
 
 		games = append(games, Game{
@@ -339,18 +355,32 @@ func scrapeTeamSchedule(displayName, url, htmlName, color string) ([]Game, error
 				if visitor == htmlName {
 					opponent = home
 					homeAway = "Away"
-					if visitorScore != "×" && homeScore != "×" {
-						score = fmt.Sprintf("%s-%s", visitorScore, homeScore)
+					if visitorScore != "×" && homeScore != "×" && visitorScore != "" && homeScore != "" {
+						// We are visitor, so our score is visitorScore
+						ourScore, _ := strconv.Atoi(visitorScore)
+						theirScore, _ := strconv.Atoi(homeScore)
+						if ourScore > theirScore {
+							score = fmt.Sprintf("%s-%s (W)", visitorScore, homeScore)
+						} else {
+							score = fmt.Sprintf("%s-%s (L)", visitorScore, homeScore)
+						}
 					} else {
-						score = "-"
+						score = ""
 					}
 				} else if home == htmlName {
 					opponent = visitor
 					homeAway = "Home"
-					if visitorScore != "×" && homeScore != "×" {
-						score = fmt.Sprintf("%s-%s", homeScore, visitorScore)
+					if visitorScore != "×" && homeScore != "×" && visitorScore != "" && homeScore != "" {
+						// We are home, so our score is homeScore
+						ourScore, _ := strconv.Atoi(homeScore)
+						theirScore, _ := strconv.Atoi(visitorScore)
+						if ourScore > theirScore {
+							score = fmt.Sprintf("%s-%s (W)", homeScore, visitorScore)
+						} else {
+							score = fmt.Sprintf("%s-%s (L)", homeScore, visitorScore)
+						}
 					} else {
-						score = "-"
+						score = ""
 					}
 				} else {
 					// Skip this row if it doesn't contain our team
@@ -1030,12 +1060,11 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 		return fmt.Errorf("error writing file: %v", err)
 	}
 
-	fmt.Printf("Generated %s\n", outputFile)
 	return nil
 }
 
 func main() {
-	fmt.Println("Starting schedule scraper...\n")
+	fmt.Println("Starting schedule scraper...")
 
 	var allGames []Game
 
@@ -1121,5 +1150,5 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\n✓ Done! Generated %s/index.html and individual team pages in %s/[team]/index.html.\n", outputDir, outputDir)
+	fmt.Printf("\n✓ Done! Generated to %s\n", outputDir, outputDir)
 }
