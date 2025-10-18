@@ -3,8 +3,13 @@
     "allow": [
       "WebFetch(domain:tourneymachine.com)",
       "WebFetch(domain:docs.google.com)",
-      "Bash(node scrape_schedules.js)",
-      "Bash(node generate.js:*)"
+      "Bash(go build:*)",
+      "Bash(curl:*)",
+      "Read(//tmp/**)",
+      "Bash(cat:*)",
+      "Bash(go run:*)",
+      "Bash(./generate test-output:*)",
+      "Bash(GOOS=linux GOARCH=amd64 go build:*)"
     ],
     "deny": [],
     "ask": []

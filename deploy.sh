@@ -5,20 +5,20 @@
 set -e
 
 # Configuration
-DOMAIN="schedule.omahalightningbasketball.com"
-# DOMAIN="testing.jerodsanto.net"
 REMOTE_HOST="mydh"
 
-echo "📦 Deploying to ${REMOTE_HOST}:~/${DOMAIN}..."
+echo "📦 Deploying binary to ${REMOTE_HOST}"
 
-# Check if dist directory exists
-if [ ! -d "dist" ]; then
-    echo "❌ Error: dist directory not found. Run 'npm start' first to generate the files."
-    exit 1
-fi
+# Compile Linux binary
+echo "🔨 Compiling Linux binary..."
+GOOS=linux GOARCH=amd64 go build -o generate-linux
 
-# Use rsync to upload the dist directory contents
-rsync -avz --delete dist/ ${REMOTE_HOST}:~/${DOMAIN}/
+# Upload binary to remote scripts directory
+echo "📤 Uploading binary to ${REMOTE_HOST}:~/scripts..."
+scp generate-linux ${REMOTE_HOST}:~/scripts/
+
+# Delete local binary
+echo "🗑️  Removing local binary..."
+rm generate-linux
 
 echo "✅ Deploy complete!"
-echo "🌐 Your site should be available at https://${DOMAIN}"
