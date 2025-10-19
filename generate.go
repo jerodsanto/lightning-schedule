@@ -360,9 +360,9 @@ func scrapeTeamSchedule(displayName, url, htmlName, color string) ([]Game, error
 						ourScore, _ := strconv.Atoi(visitorScore)
 						theirScore, _ := strconv.Atoi(homeScore)
 						if ourScore > theirScore {
-							score = fmt.Sprintf("%s-%s (W)", visitorScore, homeScore)
+							score = fmt.Sprintf("W %s-%s", visitorScore, homeScore)
 						} else {
-							score = fmt.Sprintf("%s-%s (L)", visitorScore, homeScore)
+							score = fmt.Sprintf("L %s-%s", visitorScore, homeScore)
 						}
 					} else {
 						score = ""
@@ -375,9 +375,9 @@ func scrapeTeamSchedule(displayName, url, htmlName, color string) ([]Game, error
 						ourScore, _ := strconv.Atoi(homeScore)
 						theirScore, _ := strconv.Atoi(visitorScore)
 						if ourScore > theirScore {
-							score = fmt.Sprintf("%s-%s (W)", homeScore, visitorScore)
+							score = fmt.Sprintf("W %s-%s", homeScore, visitorScore)
 						} else {
-							score = fmt.Sprintf("%s-%s (L)", homeScore, visitorScore)
+							score = fmt.Sprintf("L %s-%s", homeScore, visitorScore)
 						}
 					} else {
 						score = ""
@@ -615,12 +615,18 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 	var html strings.Builder
 	now := time.Now().UTC()
 
+	// Determine page title and heading based on filter
+	pageTitle := "Lightning Game Schedule"
+	if filterTeam != "" {
+		pageTitle = filterTeam + " Game Schedule"
+	}
+
 	html.WriteString(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lightning Game Schedule</title>
+    <title>` + pageTitle + `</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -834,7 +840,7 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
     </style>
 </head>
 <body>
-    <h1>⚡️ Lightning Game Schedule</h1>
+    <h1>⚡️ ` + pageTitle + `</h1>
     <p id="lastUpdated" style="text-align: center; color: #999; font-size: 0.75rem; margin: -10px 0 20px 0;" data-utc="` +
 		now.Format(time.RFC3339) + `">Last updated on ` + now.Format("1/2/06") + ` at ` + now.Format("3:04PM") + ` UTC</p>
     <div class="filter-buttons">
