@@ -675,11 +675,17 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
             padding: 10px;
             border-bottom: 1px solid #ddd;
         }
-        tr.month-end td {
-            border-bottom: 3px solid #fbcb44;
+        tr.week-start td {
+            border-top: 3px solid #fbcb44;
         }
         tr:hover {
             background-color: #f5f5f5;
+        }
+        tr.past-game {
+            background-color: #f9f9f9;
+        }
+        tr.past-game:hover {
+            background-color: #e8e8e8;
         }
         .team-badge {
             display: inline-block;
@@ -900,17 +906,24 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 
 	// Add game rows
 	for i, game := range sortedGames {
-		// Determine if this is the last game of its month
-		isMonthEnd := false
-		if i < len(sortedGames)-1 {
-			currentDate := parseDateForSorting(game.Date)
-			nextDate := parseDateForSorting(sortedGames[i+1].Date)
+		// Determine if this is the first game of a new calendar week
+		isWeekStart := false
+		currentDate := parseDateForSorting(game.Date)
+		if currentDate.Year() != 2099 {
+			if i == 0 {
+				// First game overall is a week start
+				isWeekStart = true
+			} else {
+				prevDate := parseDateForSorting(sortedGames[i-1].Date)
+				// Get the ISO week year and week number for both dates
+				currentYear, currentWeek := currentDate.ISOWeek()
+				prevYear, prevWeek := prevDate.ISOWeek()
 
-			if currentDate.Month() != nextDate.Month() || currentDate.Year() != nextDate.Year() {
-				isMonthEnd = true
+				// If they're in different weeks, this is the first game of a new week
+				if currentYear != prevYear || currentWeek != prevWeek {
+					isWeekStart = true
+				}
 			}
-		} else {
-			isMonthEnd = true
 		}
 
 		// Combine date and time in format: "Sat Oct 18 11AM"
@@ -965,9 +978,9 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 			locationHTML = locationDisplay.Abbr
 		}
 
-		monthEndClass := ""
-		if isMonthEnd {
-			monthEndClass = " month-end"
+		weekStartClass := ""
+		if isWeekStart {
+			weekStartClass = " week-start"
 		}
 
 		opponent := game.Opponent
@@ -975,11 +988,17 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 			opponent = "TBD"
 		}
 		score := game.Score
-		if score == "" {
-			score = "-"
+		if score == "-" {
+			score = ""
 		}
 
-		html.WriteString(fmt.Sprintf(`            <tr class="game-row%s" data-team="%s">
+		// Check if game is in the past (has a score with W/L indicator)
+		pastGameClass := ""
+		if strings.HasPrefix(game.Score, "W ") || strings.HasPrefix(game.Score, "L ") {
+			pastGameClass = " past-game"
+		}
+
+		html.WriteString(fmt.Sprintf(`            <tr class="game-row%s%s" data-team="%s">
                 <td><span class="team-badge" style="background-color: %s; color: %s;%s">%s</span></td>
                 <td>%s</td>
                 <td>%s</td>
@@ -987,7 +1006,7 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
                 <td>%s</td>
                 <td>%s</td>
             </tr>
-`, monthEndClass, game.Team, teamColor, textColor, borderStyle, game.Team, displayDateTime, locationHTML, jerseyText, opponent, score))
+`, weekStartClass, pastGameClass, game.Team, teamColor, textColor, borderStyle, game.Team, displayDateTime, locationHTML, jerseyText, opponent, score))
 	}
 
 	html.WriteString(`        </tbody>
@@ -1156,5 +1175,5 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\n✓ Done! Generated to %s\n", outputDir, outputDir)
+	fmt.Printf("\n✓ Done! Generated to %s\n", outputDir)
 }
