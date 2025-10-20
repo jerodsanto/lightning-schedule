@@ -106,8 +106,16 @@ type Game struct {
 
 // Note represents a note to display on a specific date
 type Note struct {
-	Date string
-	Text string
+	Date  string
+	Text  string
+	Teams string // Comma-separated team names or "All Teams"
+}
+
+// ScheduleItem represents either a game or a note in the schedule
+type ScheduleItem struct {
+	IsNote bool
+	Game   *Game
+	Note   *Note
 }
 
 // getTeamColor returns the team color or default
@@ -345,7 +353,7 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			continue
 		}
 
-		// Expected columns: Date, Text (with potential third column for link URL)
+		// Expected columns: Date, Text, Link URL (optional), Teams
 		if len(record) < 2 {
 			continue
 		}
@@ -358,16 +366,13 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			continue
 		}
 
-		// Check if there's a third column with a link URL
-		// This supports the pattern: Date | Text | URL
-		// where we'll convert Text into a hyperlink to URL
-		if len(record) >= 3 && strings.TrimSpace(record[2]) != "" {
-			linkURL := strings.TrimSpace(record[2])
-			// Wrap the entire text in a link
-			text = fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, linkURL, text)
-		} else {
-			// Parse the text for embedded links (markdown style or bare URLs)
-			text = parseNoteTextWithLinks(text)
+		// Parse the text for embedded links (markdown style or bare URLs)
+		text = parseNoteTextWithLinks(text)
+
+		// Get teams from third column (or default to empty string)
+		teams := ""
+		if len(record) >= 3 {
+			teams = strings.TrimSpace(record[2])
 		}
 
 		// Parse date to standard format
@@ -381,8 +386,9 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 		}
 
 		notes = append(notes, Note{
-			Date: formattedDate,
-			Text: text,
+			Date:  formattedDate,
+			Text:  text,
+			Teams: teams,
 		})
 	}
 
@@ -685,9 +691,43 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		gamesToDisplay = allGames
 	}
 
-	// Sort games by date and time
-	sortedGames := make([]Game, len(gamesToDisplay))
-	copy(sortedGames, gamesToDisplay)
+	// Filter notes based on the team filter
+	var notesToDisplay []Note
+	for _, note := range allNotes {
+		// For combined schedule (no filter), show all notes
+		if filterTeam == "" {
+			notesToDisplay = append(notesToDisplay, note)
+		} else {
+			// For team pages, only show notes that:
+			// 1. Have "All Teams" in the Teams column (case-insensitive), OR
+			// 2. Have the team name in the Teams column
+			teamsLower := strings.ToLower(note.Teams)
+			filterTeamLower := strings.ToLower(filterTeam)
+
+			if teamsLower == "all teams" || strings.Contains(teamsLower, filterTeamLower) {
+				notesToDisplay = append(notesToDisplay, note)
+			}
+		}
+	}
+
+	// Create combined list of schedule items (games and notes)
+	var scheduleItems []ScheduleItem
+
+	// Add all games as schedule items
+	for i := range gamesToDisplay {
+		scheduleItems = append(scheduleItems, ScheduleItem{
+			IsNote: false,
+			Game:   &gamesToDisplay[i],
+		})
+	}
+
+	// Add all notes as schedule items
+	for i := range notesToDisplay {
+		scheduleItems = append(scheduleItems, ScheduleItem{
+			IsNote: true,
+			Note:   &notesToDisplay[i],
+		})
+	}
 
 	// Define team order for sorting
 	teamOrderMap := map[string]int{
@@ -695,18 +735,47 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		"12U Blue": 5, "10U Red": 6, "10U Black": 7,
 	}
 
-	sort.Slice(sortedGames, func(i, j int) bool {
-		dateA := parseDateForSorting(sortedGames[i].Date)
-		dateB := parseDateForSorting(sortedGames[j].Date)
+	// Sort schedule items by date and time
+	sort.Slice(scheduleItems, func(i, j int) bool {
+		var dateA, dateB time.Time
+
+		// Get dates for comparison
+		if scheduleItems[i].IsNote {
+			dateA = parseDateForSorting(scheduleItems[i].Note.Date)
+		} else {
+			dateA = parseDateForSorting(scheduleItems[i].Game.Date)
+		}
+
+		if scheduleItems[j].IsNote {
+			dateB = parseDateForSorting(scheduleItems[j].Note.Date)
+		} else {
+			dateB = parseDateForSorting(scheduleItems[j].Game.Date)
+		}
 
 		// First sort by date
 		if !dateA.Equal(dateB) {
 			return dateA.Before(dateB)
 		}
 
-		// If dates are the same, check times
-		timeA := sortedGames[i].Time
-		timeB := sortedGames[j].Time
+		// Notes come before games on the same date
+		if scheduleItems[i].IsNote && !scheduleItems[j].IsNote {
+			return true
+		}
+		if !scheduleItems[i].IsNote && scheduleItems[j].IsNote {
+			return false
+		}
+
+		// Both are notes - maintain order
+		if scheduleItems[i].IsNote && scheduleItems[j].IsNote {
+			return false
+		}
+
+		// Both are games - sort by time then team
+		gameA := scheduleItems[i].Game
+		gameB := scheduleItems[j].Game
+
+		timeA := gameA.Time
+		timeB := gameB.Time
 		isTBDA := timeA == "TBD" || timeA == ""
 		isTBDB := timeB == "TBD" || timeB == ""
 
@@ -719,22 +788,22 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 				return timeMinA < timeMinB
 			}
 			// Same time - sort by team order
-			orderA := teamOrderMap[sortedGames[i].Team]
-			orderB := teamOrderMap[sortedGames[j].Team]
+			orderA := teamOrderMap[gameA.Team]
+			orderB := teamOrderMap[gameB.Team]
 			if orderA != orderB {
 				return orderA < orderB
 			}
-			return sortedGames[i].Team < sortedGames[j].Team
+			return gameA.Team < gameB.Team
 		}
 
 		if isTBDA && isTBDB {
 			// Both are TBD - group by team
-			orderA := teamOrderMap[sortedGames[i].Team]
-			orderB := teamOrderMap[sortedGames[j].Team]
+			orderA := teamOrderMap[gameA.Team]
+			orderB := teamOrderMap[gameB.Team]
 			if orderA != orderB {
 				return orderA < orderB
 			}
-			return sortedGames[i].Team < sortedGames[j].Team
+			return gameA.Team < gameB.Team
 		}
 
 		// One has time, one is TBD - games with times come first
@@ -856,7 +925,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             color: black;
             text-align: center;
             font-weight: bold;
-            border-bottom: 2px solid #f0f0f0;
+            border-bottom: 2px solid #ddd;
         }
         tr.note-row a {
             color: black;
@@ -1069,47 +1138,42 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
         <tbody>
 `)
 
-	// Create a map of dates to notes for quick lookup
-	notesByDate := make(map[string][]Note)
-	for _, note := range allNotes {
-		notesByDate[note.Date] = append(notesByDate[note.Date], note)
-	}
-
-	// Track the last date we've seen to know when to insert notes
-	var lastSeenDate string
-
-	// Add game rows
-	for i, game := range sortedGames {
-		// Check if this is a new date and if there are notes for this date
-		if game.Date != lastSeenDate {
-			if notes, hasNotes := notesByDate[game.Date]; hasNotes {
-				for _, note := range notes {
-					// Note text is already HTML with embedded links preserved
-					html.WriteString(fmt.Sprintf(`            <tr class="note-row">
+	// Iterate through schedule items (games and notes)
+	for i, item := range scheduleItems {
+		if item.IsNote {
+			// Render note row
+			html.WriteString(fmt.Sprintf(`            <tr class="note-row">
                 <td colspan="6">%s</td>
             </tr>
-`, note.Text))
-				}
-			}
-			lastSeenDate = game.Date
+`, item.Note.Text))
+			continue
 		}
+
+		// Render game row
+		game := item.Game
 
 		// Determine if this is the first game of a new calendar week
 		isWeekStart := false
 		currentDate := parseDateForSorting(game.Date)
 		if currentDate.Year() != 2099 {
+			// Check if this is the first item or first game
 			if i == 0 {
-				// First game overall is a week start
 				isWeekStart = true
 			} else {
-				prevDate := parseDateForSorting(sortedGames[i-1].Date)
-				// Get the ISO week year and week number for both dates
-				currentYear, currentWeek := currentDate.ISOWeek()
-				prevYear, prevWeek := prevDate.ISOWeek()
+				// Look backwards to find the previous game (skip notes)
+				for j := i - 1; j >= 0; j-- {
+					if !scheduleItems[j].IsNote {
+						prevDate := parseDateForSorting(scheduleItems[j].Game.Date)
+						// Get the ISO week year and week number for both dates
+						currentYear, currentWeek := currentDate.ISOWeek()
+						prevYear, prevWeek := prevDate.ISOWeek()
 
-				// If they're in different weeks, this is the first game of a new week
-				if currentYear != prevYear || currentWeek != prevWeek {
-					isWeekStart = true
+						// If they're in different weeks, this is the first game of a new week
+						if currentYear != prevYear || currentWeek != prevWeek {
+							isWeekStart = true
+						}
+						break
+					}
 				}
 			}
 		}
