@@ -22,6 +22,9 @@ const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
 
 var googleSheetCSVURL = fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv", googleSheetID)
 
+// Notes sheet gid
+var googleSheetNotesCSVURL = fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=436458989", googleSheetID)
+
 // Location abbreviations
 // Maps base location names (without court/gym) to shorter versions
 var locationAbbreviations = map[string]string{
@@ -99,6 +102,12 @@ type Game struct {
 	HomeAway string
 	Score    string
 	Color    string
+}
+
+// Note represents a note to display on a specific date
+type Note struct {
+	Date string
+	Text string
 }
 
 // getTeamColor returns the team color or default
@@ -275,6 +284,110 @@ func fetchGoogleSheetGames() ([]Game, error) {
 
 	fmt.Printf("Found %d games in Google Sheet\n", len(games))
 	return games, nil
+}
+
+// parseNoteTextWithLinks converts note text to HTML, handling embedded links
+// Supports formats:
+// - Plain URLs: http://example.com -> clickable link
+// - Markdown style: [text](url) -> <a href="url">text</a>
+// - Just pass through any existing HTML from copy-paste
+func parseNoteTextWithLinks(text string) string {
+	// First, convert markdown-style links [text](url)
+	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\((https?://[^\)]+)\)`)
+	text = markdownLinkRegex.ReplaceAllString(text, `<a href="$2" target="_blank">$1</a>`)
+
+	// Then convert bare URLs that aren't already in anchor tags
+	urlRegex := regexp.MustCompile(`(?:^|[^"'>])(https?://[^\s<]+)`)
+	text = urlRegex.ReplaceAllStringFunc(text, func(match string) string {
+		// Check if this URL is already part of an href attribute
+		if strings.Contains(match, `href="`) {
+			return match
+		}
+		// Extract just the URL part (might have leading space/character)
+		parts := strings.SplitN(match, "http", 2)
+		if len(parts) == 2 {
+			url := "http" + parts[1]
+			return parts[0] + fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, url, url)
+		}
+		return match
+	})
+
+	return text
+}
+
+// fetchGoogleSheetNotes fetches and parses notes from Google Sheets
+func fetchGoogleSheetNotes() ([]Note, error) {
+	fmt.Println("Fetching notes from Google Sheet...")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(googleSheetNotesCSVURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching Google Sheet notes: %v", err)
+	}
+	defer resp.Body.Close()
+
+	reader := csv.NewReader(resp.Body)
+	var notes []Note
+
+	// Read header row
+	_, err = reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV header: %v", err)
+	}
+
+	// Parse data rows
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		// Expected columns: Date, Text (with potential third column for link URL)
+		if len(record) < 2 {
+			continue
+		}
+
+		date := strings.TrimSpace(record[0])
+		text := strings.TrimSpace(record[1])
+
+		// Skip rows with missing data
+		if date == "" || text == "" {
+			continue
+		}
+
+		// Check if there's a third column with a link URL
+		// This supports the pattern: Date | Text | URL
+		// where we'll convert Text into a hyperlink to URL
+		if len(record) >= 3 && strings.TrimSpace(record[2]) != "" {
+			linkURL := strings.TrimSpace(record[2])
+			// Wrap the entire text in a link
+			text = fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, linkURL, text)
+		} else {
+			// Parse the text for embedded links (markdown style or bare URLs)
+			text = parseNoteTextWithLinks(text)
+		}
+
+		// Parse date to standard format
+		formattedDate := date
+		if dateObj, err := time.Parse("1/2/2006", date); err == nil {
+			formattedDate = dateObj.Format("Monday, January 2, 2006")
+		} else if dateObj, err := time.Parse("01/02/2006", date); err == nil {
+			formattedDate = dateObj.Format("Monday, January 2, 2006")
+		} else if dateObj, err := time.Parse("1/2/06", date); err == nil {
+			formattedDate = dateObj.Format("Monday, January 2, 2006")
+		}
+
+		notes = append(notes, Note{
+			Date: formattedDate,
+			Text: text,
+		})
+	}
+
+	fmt.Printf("Found %d notes in Google Sheet\n", len(notes))
+	return notes, nil
 }
 
 // scrapeTeamSchedule scrapes schedule data for a single team
@@ -549,8 +662,17 @@ func getLocationDisplay(location string) LocationDisplay {
 	}
 }
 
+// convertLinksToHTML converts URLs in text to HTML anchor tags
+func convertLinksToHTML(text string) string {
+	// Match URLs (http:// or https://)
+	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
+	return urlRegex.ReplaceAllStringFunc(text, func(url string) string {
+		return fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, url, url)
+	})
+}
+
 // generateHTML generates HTML schedule page
-func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
+func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
 	// Filter games if a specific team is requested
 	var gamesToDisplay []Game
 	if filterTeam != "" {
@@ -566,6 +688,13 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 	// Sort games by date and time
 	sortedGames := make([]Game, len(gamesToDisplay))
 	copy(sortedGames, gamesToDisplay)
+
+	// Define team order for sorting
+	teamOrderMap := map[string]int{
+		"Varsity": 1, "JV": 2, "14U Gold": 3, "14U White": 4,
+		"12U Blue": 5, "10U Red": 6, "10U Black": 7,
+	}
+
 	sort.Slice(sortedGames, func(i, j int) bool {
 		dateA := parseDateForSorting(sortedGames[i].Date)
 		dateB := parseDateForSorting(sortedGames[j].Date)
@@ -575,8 +704,41 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
 			return dateA.Before(dateB)
 		}
 
-		// If dates are the same, sort by time
-		return parseTimeToMinutes(sortedGames[i].Time) < parseTimeToMinutes(sortedGames[j].Time)
+		// If dates are the same, check times
+		timeA := sortedGames[i].Time
+		timeB := sortedGames[j].Time
+		isTBDA := timeA == "TBD" || timeA == ""
+		isTBDB := timeB == "TBD" || timeB == ""
+
+		// If both have times or both are TBD, sort by time then team
+		if !isTBDA && !isTBDB {
+			// Both have times - sort by time
+			timeMinA := parseTimeToMinutes(timeA)
+			timeMinB := parseTimeToMinutes(timeB)
+			if timeMinA != timeMinB {
+				return timeMinA < timeMinB
+			}
+			// Same time - sort by team order
+			orderA := teamOrderMap[sortedGames[i].Team]
+			orderB := teamOrderMap[sortedGames[j].Team]
+			if orderA != orderB {
+				return orderA < orderB
+			}
+			return sortedGames[i].Team < sortedGames[j].Team
+		}
+
+		if isTBDA && isTBDB {
+			// Both are TBD - group by team
+			orderA := teamOrderMap[sortedGames[i].Team]
+			orderB := teamOrderMap[sortedGames[j].Team]
+			if orderA != orderB {
+				return orderA < orderB
+			}
+			return sortedGames[i].Team < sortedGames[j].Team
+		}
+
+		// One has time, one is TBD - games with times come first
+		return !isTBDA
 	})
 
 	// Get unique teams in the order they appear in teamURLs
@@ -686,6 +848,19 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
         }
         tr.past-game:hover {
             background-color: #e8e8e8;
+        }
+        tr.note-row td {
+            background-color: #fbcb44;
+            color: black;
+            text-align: center;
+            font-weight: bold;
+        }
+        tr.note-row a {
+            color: black;
+            text-decoration: underline;
+        }
+        tr.note-row a:hover {
+            color: #004499;
         }
         .team-badge {
             display: inline-block;
@@ -904,8 +1079,31 @@ func generateHTML(allGames []Game, outputFile string, filterTeam string) error {
         <tbody>
 `)
 
+	// Create a map of dates to notes for quick lookup
+	notesByDate := make(map[string][]Note)
+	for _, note := range allNotes {
+		notesByDate[note.Date] = append(notesByDate[note.Date], note)
+	}
+
+	// Track the last date we've seen to know when to insert notes
+	var lastSeenDate string
+
 	// Add game rows
 	for i, game := range sortedGames {
+		// Check if this is a new date and if there are notes for this date
+		if game.Date != lastSeenDate {
+			if notes, hasNotes := notesByDate[game.Date]; hasNotes {
+				for _, note := range notes {
+					// Note text is already HTML with embedded links preserved
+					html.WriteString(fmt.Sprintf(`            <tr class="note-row">
+                <td colspan="6">%s</td>
+            </tr>
+`, note.Text))
+				}
+			}
+			lastSeenDate = game.Date
+		}
+
 		// Determine if this is the first game of a new calendar week
 		isWeekStart := false
 		currentDate := parseDateForSorting(game.Date)
@@ -1113,6 +1311,13 @@ func main() {
 		allGames = append(allGames, sheetGames...)
 	}
 
+	// Fetch notes from Google Sheet
+	allNotes, err := fetchGoogleSheetNotes()
+	if err != nil {
+		fmt.Printf("Error fetching notes from Google Sheet: %v\n", err)
+		allNotes = []Note{} // Use empty slice if fetch fails
+	}
+
 	if len(allGames) == 0 {
 		fmt.Println("\nNo games found. Please check the URLs and try again.")
 		os.Exit(1)
@@ -1149,7 +1354,7 @@ func main() {
 	}
 
 	// Generate combined schedule as index.html in output directory
-	err = generateHTML(allGames, filepath.Join(distDir, "index.html"), "")
+	err = generateHTML(allGames, allNotes, filepath.Join(distDir, "index.html"), "")
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
@@ -1169,7 +1374,7 @@ func main() {
 			fmt.Printf("Error creating team directory: %v\n", err)
 			continue
 		}
-		err = generateHTML(allGames, filepath.Join(teamDir, "index.html"), team)
+		err = generateHTML(allGames, allNotes, filepath.Join(teamDir, "index.html"), team)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
 		}
