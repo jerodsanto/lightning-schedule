@@ -6,19 +6,22 @@ set -e
 
 # Configuration
 REMOTE_HOST="mydh"
-
-echo "📦 Deploying binary to ${REMOTE_HOST}"
+BINARY="lightning-schedule"
 
 # Compile Linux binary
 echo "🔨 Compiling Linux binary..."
-GOOS=linux GOARCH=amd64 go build -o generate-linux
+GOOS=linux GOARCH=amd64 go build -o ${BINARY}
 
 # Upload binary to remote scripts directory
 echo "📤 Uploading binary to ${REMOTE_HOST}:~/scripts..."
-scp generate-linux ${REMOTE_HOST}:~/scripts/
+scp -q ${BINARY} ${REMOTE_HOST}:~/scripts/
+
+# Execute the binary remotely
+echo "🚀 Executing binary on ${REMOTE_HOST}..."
+ssh ${REMOTE_HOST} "~/scripts/${BINARY} ~/schedule.omahalightningbasketball.com"
 
 # Delete local binary
 echo "🗑️  Removing local binary..."
-rm generate-linux
+rm ${BINARY}
 
 echo "✅ Deploy complete!"
