@@ -38,7 +38,7 @@ var locationAbbreviations = map[string]string{
 	"EPS Woodbrook Elementary":                "Woodbrook",
 	"EPS West Dodge Station Elementary":       "West Dodge Station",
 	"EPS Arbor View Elementary":               "Arbor View",
-	"Nebraska Basketball Academy":             "Nebraska Basketball Academy",
+	"Nebraska Basketball Academy":             "",
 	"Iowa West Fieldhouse":                    "",
 }
 
@@ -788,6 +788,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡️</text></svg>">
     <title>` + pageTitle + `</title>
     <style>
         body {
@@ -826,6 +827,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             border-collapse: collapse;
             background-color: white;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 15px;
         }
         th {
             background-color: #fbcb44;
@@ -838,7 +840,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             border-bottom: 1px solid #ddd;
         }
         tr.week-start td {
-            border-top: 3px solid #fbcb44;
+            border-top: 2px solid #fbcb44;
         }
         tr:hover {
             background-color: #f5f5f5;
@@ -850,10 +852,11 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             background-color: #e8e8e8;
         }
         tr.note-row td {
-            background-color: #fbcb44;
+            background-color: #f0f0f0;
             color: black;
             text-align: center;
             font-weight: bold;
+            border-bottom: 2px solid #f0f0f0;
         }
         tr.note-row a {
             color: black;
@@ -869,22 +872,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             color: black;
             border-radius: 4px;
             font-size: 0.9em;
-        }
-        .home-away-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.8em;
-            font-weight: bold;
-            margin-left: 4px;
-        }
-        .home {
-            background-color: #4CAF50;
-            color: white;
-        }
-        .away {
-            background-color: #FF9800;
-            color: white;
         }
         .location-wrapper {
             position: relative;
@@ -1016,6 +1003,9 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
             .filter-btn {
                 padding: 5px 8px;
                 font-size: 0.8em;
+            }
+            tr.note-row td {
+            		text-align: justify;
             }
         }
     </style>
