@@ -1340,6 +1340,227 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	return nil
 }
 
+// generateICalendar generates an iCal file for games and notes
+func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
+	// Filter games if a specific team is requested
+	var gamesToExport []Game
+	if filterTeam != "" {
+		for _, game := range allGames {
+			if game.Team == filterTeam {
+				gamesToExport = append(gamesToExport, game)
+			}
+		}
+	} else {
+		gamesToExport = allGames
+	}
+
+	// Filter notes based on the team filter
+	var notesToExport []Note
+	for _, note := range allNotes {
+		// For combined schedule (no filter), show all notes
+		if filterTeam == "" {
+			notesToExport = append(notesToExport, note)
+		} else {
+			// For team calendars, only show notes that:
+			// 1. Have "All Teams" in the Teams column (case-insensitive), OR
+			// 2. Have the team name in the Teams column
+			teamsLower := strings.ToLower(note.Teams)
+			filterTeamLower := strings.ToLower(filterTeam)
+
+			if teamsLower == "all teams" || strings.Contains(teamsLower, filterTeamLower) {
+				notesToExport = append(notesToExport, note)
+			}
+		}
+	}
+
+	var ical strings.Builder
+
+	// iCal header
+	ical.WriteString("BEGIN:VCALENDAR\r\n")
+	ical.WriteString("VERSION:2.0\r\n")
+	ical.WriteString("PRODID:-//Omaha Lightning//Basketball Schedule//EN\r\n")
+	ical.WriteString("CALSCALE:GREGORIAN\r\n")
+	ical.WriteString("METHOD:PUBLISH\r\n")
+	ical.WriteString("X-WR-CALNAME:Lightning Schedule")
+	if filterTeam != "" {
+		ical.WriteString(" - " + filterTeam)
+	}
+	ical.WriteString("\r\n")
+	ical.WriteString("X-WR-TIMEZONE:America/Chicago\r\n")
+
+	// Central timezone definition
+	ical.WriteString("BEGIN:VTIMEZONE\r\n")
+	ical.WriteString("TZID:America/Chicago\r\n")
+	ical.WriteString("BEGIN:DAYLIGHT\r\n")
+	ical.WriteString("TZOFFSETFROM:-0600\r\n")
+	ical.WriteString("TZOFFSETTO:-0500\r\n")
+	ical.WriteString("DTSTART:19700308T020000\r\n")
+	ical.WriteString("RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU\r\n")
+	ical.WriteString("TZNAME:CDT\r\n")
+	ical.WriteString("END:DAYLIGHT\r\n")
+	ical.WriteString("BEGIN:STANDARD\r\n")
+	ical.WriteString("TZOFFSETFROM:-0500\r\n")
+	ical.WriteString("TZOFFSETTO:-0600\r\n")
+	ical.WriteString("DTSTART:19701101T020000\r\n")
+	ical.WriteString("RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU\r\n")
+	ical.WriteString("TZNAME:CST\r\n")
+	ical.WriteString("END:STANDARD\r\n")
+	ical.WriteString("END:VTIMEZONE\r\n")
+
+	// Add game events
+	for _, game := range gamesToExport {
+		// Parse date
+		dateObj := parseDateForSorting(game.Date)
+		if dateObj.Year() == 2099 {
+			continue // Skip games with invalid dates
+		}
+
+		// Parse time - determine if TBD
+		isTBD := game.Time == "TBD" || game.Time == ""
+
+		var startTime, endTime time.Time
+
+		if isTBD {
+			// All-day event for TBD games
+			startTime = time.Date(dateObj.Year(), dateObj.Month(), dateObj.Day(), 0, 0, 0, 0, time.UTC)
+			endTime = startTime.Add(24 * time.Hour)
+		} else {
+			// Parse time like "6:00 PM" or "10:30 AM"
+			re := regexp.MustCompile(`(\d+):(\d+)\s*(AM|PM)`)
+			match := re.FindStringSubmatch(game.Time)
+			if len(match) == 4 {
+				hours, _ := strconv.Atoi(match[1])
+				minutes, _ := strconv.Atoi(match[2])
+				ampm := strings.ToUpper(match[3])
+
+				if ampm == "PM" && hours != 12 {
+					hours += 12
+				} else if ampm == "AM" && hours == 12 {
+					hours = 0
+				}
+
+				// Create time in Central timezone
+				centralLoc, _ := time.LoadLocation("America/Chicago")
+				startTime = time.Date(dateObj.Year(), dateObj.Month(), dateObj.Day(), hours, minutes, 0, 0, centralLoc)
+				// Assume games are 1 hour long
+				endTime = startTime.Add(1 * time.Hour)
+			} else {
+				// Fallback to all-day if time parsing fails
+				isTBD = true
+				startTime = time.Date(dateObj.Year(), dateObj.Month(), dateObj.Day(), 0, 0, 0, 0, time.UTC)
+				endTime = startTime.Add(24 * time.Hour)
+			}
+		}
+
+		// Create event UID
+		uid := fmt.Sprintf("game-%s-%s-%s@lightningschedule.local",
+			strings.ReplaceAll(game.Team, " ", ""),
+			dateObj.Format("20060102"),
+			strings.ReplaceAll(game.Time, " ", ""))
+
+		ical.WriteString("BEGIN:VEVENT\r\n")
+		ical.WriteString("UID:" + uid + "\r\n")
+		ical.WriteString("DTSTAMP:" + time.Now().UTC().Format("20060102T150405Z") + "\r\n")
+
+		if isTBD {
+			// All-day event format
+			ical.WriteString("DTSTART;VALUE=DATE:" + startTime.Format("20060102") + "\r\n")
+			ical.WriteString("DTEND;VALUE=DATE:" + endTime.Format("20060102") + "\r\n")
+		} else {
+			// Timed event format
+			ical.WriteString("DTSTART;TZID=America/Chicago:" + startTime.Format("20060102T150405") + "\r\n")
+			ical.WriteString("DTEND;TZID=America/Chicago:" + endTime.Format("20060102T150405") + "\r\n")
+		}
+
+		// Event title
+		summary := game.Team + " vs " + game.Opponent
+		if game.HomeAway == "Away" {
+			summary = game.Team + " @ " + game.Opponent
+		}
+		ical.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
+
+		// Description with game details
+		description := fmt.Sprintf("Team: %s\\nOpponent: %s\\nJersey: %s",
+			game.Team, game.Opponent, game.HomeAway)
+		if game.Score != "" && game.Score != "-" {
+			description += "\\nScore: " + game.Score
+		}
+		ical.WriteString("DESCRIPTION:" + escapeICalText(description) + "\r\n")
+
+		// Location
+		if game.Location != "" && game.Location != "TBD" {
+			ical.WriteString("LOCATION:" + escapeICalText(game.Location) + "\r\n")
+		}
+
+		ical.WriteString("END:VEVENT\r\n")
+	}
+
+	// Add note events (all-day events)
+	for _, note := range notesToExport {
+		// Parse date
+		dateObj := parseDateForSorting(note.Date)
+		if dateObj.Year() == 2099 {
+			continue // Skip notes with invalid dates
+		}
+
+		// All-day event for notes
+		startTime := time.Date(dateObj.Year(), dateObj.Month(), dateObj.Day(), 0, 0, 0, 0, time.UTC)
+		endTime := startTime.Add(24 * time.Hour)
+
+		// Create event UID
+		uid := fmt.Sprintf("note-%s-%s@lightningschedule.local",
+			dateObj.Format("20060102"),
+			fmt.Sprintf("%x", strings.ReplaceAll(note.Text, " ", "")))
+
+		// Strip HTML tags from note text for plain text summary
+		plainText := stripHTMLTags(note.Text)
+
+		ical.WriteString("BEGIN:VEVENT\r\n")
+		ical.WriteString("UID:" + uid + "\r\n")
+		ical.WriteString("DTSTAMP:" + time.Now().UTC().Format("20060102T150405Z") + "\r\n")
+		ical.WriteString("DTSTART;VALUE=DATE:" + startTime.Format("20060102") + "\r\n")
+		ical.WriteString("DTEND;VALUE=DATE:" + endTime.Format("20060102") + "\r\n")
+		ical.WriteString("SUMMARY:" + escapeICalText(plainText) + "\r\n")
+		ical.WriteString("DESCRIPTION:" + escapeICalText(plainText) + "\r\n")
+		ical.WriteString("END:VEVENT\r\n")
+	}
+
+	ical.WriteString("END:VCALENDAR\r\n")
+
+	// Write to file
+	err := os.WriteFile(outputFile, []byte(ical.String()), 0644)
+	if err != nil {
+		return fmt.Errorf("error writing iCal file: %v", err)
+	}
+
+	return nil
+}
+
+// escapeICalText escapes special characters for iCal text fields
+func escapeICalText(text string) string {
+	text = strings.ReplaceAll(text, "\\", "\\\\")
+	text = strings.ReplaceAll(text, ",", "\\,")
+	text = strings.ReplaceAll(text, ";", "\\;")
+	text = strings.ReplaceAll(text, "\n", "\\n")
+	text = strings.ReplaceAll(text, "\r", "")
+	return text
+}
+
+// stripHTMLTags removes HTML tags from text
+func stripHTMLTags(html string) string {
+	// Remove HTML tags
+	re := regexp.MustCompile(`<[^>]*>`)
+	text := re.ReplaceAllString(html, "")
+	// Decode common HTML entities
+	text = strings.ReplaceAll(text, "&nbsp;", " ")
+	text = strings.ReplaceAll(text, "&amp;", "&")
+	text = strings.ReplaceAll(text, "&lt;", "<")
+	text = strings.ReplaceAll(text, "&gt;", ">")
+	text = strings.ReplaceAll(text, "&quot;", "\"")
+	text = strings.ReplaceAll(text, "&#39;", "'")
+	return text
+}
+
 func main() {
 	fmt.Println("Starting schedule scraper...")
 
@@ -1414,6 +1635,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Generate combined iCal file
+	fmt.Println("Generating combined iCal file...")
+	err = generateICalendar(allGames, allNotes, filepath.Join(distDir, "schedule.ics"), "")
+	if err != nil {
+		fmt.Printf("Error generating combined iCal: %v\n", err)
+	}
+
 	// Generate individual team schedules in subfolders
 	teamSet := make(map[string]bool)
 	for _, game := range allGames {
@@ -1428,11 +1656,20 @@ func main() {
 			fmt.Printf("Error creating team directory: %v\n", err)
 			continue
 		}
+
+		// Generate HTML for team
 		err = generateHTML(allGames, allNotes, filepath.Join(teamDir, "index.html"), team)
 		if err != nil {
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("Error generating HTML for %s: %v\n", team, err)
+		}
+
+		// Generate iCal for team
+		fmt.Printf("Generating iCal for %s...\n", team)
+		err = generateICalendar(allGames, allNotes, filepath.Join(teamDir, "schedule.ics"), team)
+		if err != nil {
+			fmt.Printf("Error generating iCal for %s: %v\n", team, err)
 		}
 	}
 
-	fmt.Printf("\n✓ Done! Generated to %s\n", outputDir)
+	fmt.Printf("\n✓ Done! Generated HTML and iCal files to %s\n", outputDir)
 }
