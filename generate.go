@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"encoding/csv"
 	"fmt"
 	"html/template"
@@ -17,6 +18,10 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 )
+
+// Embed the template file into the binary
+//go:embed templates/schedule.html
+var scheduleTemplate string
 
 // Google Sheet ID for additional games
 const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
@@ -717,8 +722,8 @@ type TemplateData struct {
 
 // generateHTML generates HTML schedule page using templates
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
-	// Parse the template file
-	tmpl, err := template.ParseFiles("templates/schedule.html")
+	// Parse the embedded template
+	tmpl, err := template.New("schedule").Parse(scheduleTemplate)
 	if err != nil {
 		return fmt.Errorf("error parsing template: %v", err)
 	}
