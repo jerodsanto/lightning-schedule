@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"html/template"
 	"io"
 	"math"
 	"net/http"
@@ -94,21 +95,24 @@ const defaultTeamColor = "#2196F3"
 
 // Game represents a single game
 type Game struct {
-	Team     string
-	Date     string
-	Time     string
-	Location string
-	Opponent string
-	HomeAway string
-	Score    string
-	Color    string
+	Team        string
+	Date        string
+	Time        string
+	Location    string
+	Opponent    string
+	HomeAway    string
+	Score       string
+	Color       string
+	TextColor   string
+	BorderStyle string
 }
 
 // Note represents a note to display on a specific date
 type Note struct {
-	Date  string
-	Text  string
-	Teams string // Comma-separated team names or "All Teams"
+	Date     string
+	Text     string
+	HTMLText template.HTML // HTML-safe version of Text for template rendering
+	Teams    string        // Comma-separated team names or "All Teams"
 }
 
 // ScheduleItem represents either a game or a note in the schedule
@@ -386,9 +390,10 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 		}
 
 		notes = append(notes, Note{
-			Date:  formattedDate,
-			Text:  text,
-			Teams: teams,
+			Date:     formattedDate,
+			Text:     text,
+			HTMLText: template.HTML(text),
+			Teams:    teams,
 		})
 	}
 
@@ -677,8 +682,47 @@ func convertLinksToHTML(text string) string {
 	})
 }
 
-// generateHTML generates HTML schedule page
+// Template data structures
+type TeamButton struct {
+	Name        string
+	Link        string
+	Color       string
+	TextColor   string
+	BorderStyle string
+	IsActive    bool
+}
+
+type TemplateScheduleItem struct {
+	IsNote           bool
+	IsWeekStart      bool
+	IsPastGame       bool
+	Game             *Game
+	Note             *Note
+	DisplayDateTime  string
+	LocationHTML     template.HTML
+	JerseyText       string
+	OpponentDisplay  string
+	ScoreDisplay     string
+}
+
+type TemplateData struct {
+	PageTitle      string
+	UpdatedUTC     string
+	UpdatedDisplay string
+	AllTeamsLink   string
+	IsAllTeams     bool
+	Teams          []TeamButton
+	ScheduleItems  []TemplateScheduleItem
+}
+
+// generateHTML generates HTML schedule page using templates
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
+	// Parse the template file
+	tmpl, err := template.ParseFiles("templates/schedule.html")
+	if err != nil {
+		return fmt.Errorf("error parsing template: %v", err)
+	}
+
 	// Filter games if a specific team is requested
 	var gamesToDisplay []Game
 	if filterTeam != "" {
@@ -843,7 +887,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		teamColorMap[game.Team] = game.Color
 	}
 
-	var html strings.Builder
 	now := time.Now().UTC()
 
 	// Determine page title and heading based on filter
@@ -852,255 +895,13 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		pageTitle = filterTeam + " Game Schedule"
 	}
 
-	html.WriteString(`<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡️</text></svg>">
-    <title>` + pageTitle + `</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        h1 {
-            color: #333;
-            text-align: center;
-        }
-        .filter-buttons {
-            text-align: center;
-            margin: 20px 0;
-        }
-        .filter-btn {
-            padding: 8px 16px;
-            margin: 4px;
-            border: none;
-            cursor: pointer;
-            border-radius: 4px;
-            background-color: #999 !important;
-            color: white !important;
-            transition: all 0.2s;
-        }
-        .filter-btn:hover {
-            background-color: #777 !important;
-        }
-        .filter-btn.active {
-            /* Active styles set inline */
-        }
-        table {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            border-collapse: collapse;
-            background-color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            font-size: 15px;
-        }
-        th {
-            background-color: #fbcb44;
-            color: black;
-            padding: 12px;
-            text-align: left;
-        }
-        td {
-            padding: 10px;
-            border-bottom: 1px solid #ddd;
-        }
-        tr.week-start td {
-            border-top: 2px solid #fbcb44;
-        }
-        tr:hover {
-            background-color: #f5f5f5;
-        }
-        tr.past-game {
-            background-color: #f9f9f9;
-        }
-        tr.past-game:hover {
-            background-color: #e8e8e8;
-        }
-        tr.note-row td {
-            background-color: #f0f0f0;
-            color: black;
-            text-align: center;
-            font-weight: bold;
-            border-bottom: 2px solid #ddd;
-        }
-        tr.note-row a {
-            color: black;
-            text-decoration: underline;
-        }
-        tr.note-row a:hover {
-            color: #004499;
-        }
-        .team-badge {
-            display: inline-block;
-            padding: 4px 8px;
-            background-color: #2196F3;
-            color: black;
-            border-radius: 4px;
-            font-size: 0.9em;
-        }
-        .location-wrapper {
-            position: relative;
-            display: inline-block;
-            cursor: help;
-        }
-        .location-abbr {
-            text-decoration: underline;
-            text-decoration-style: dotted;
-            text-decoration-color: #999;
-        }
-        .location-tooltip {
-            visibility: hidden;
-            opacity: 0;
-            position: absolute;
-            z-index: 1000;
-            background-color: #333;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            white-space: nowrap;
-            bottom: 125%;
-            left: 50%;
-            transform: translateX(-50%);
-            transition: opacity 0.3s;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
-        }
-        .location-tooltip::after {
-            content: "";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            margin-left: -5px;
-            border-width: 5px;
-            border-style: solid;
-            border-color: #333 transparent transparent transparent;
-        }
-        .location-wrapper:hover .location-tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
-        .location-wrapper.active .location-tooltip {
-            visibility: visible;
-            opacity: 1;
-        }
-        @media (max-width: 768px) {
-            body {
-                margin: 10px;
-            }
-            h1 {
-                font-size: 1.5em;
-            }
-            .filter-buttons {
-                margin: 15px 0;
-            }
-            .filter-btn {
-                padding: 6px 10px;
-                font-size: 0.85em;
-                margin: 2px;
-            }
-            table {
-                font-size: 0.7em;
-                display: block;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-                white-space: nowrap;
-            }
-            thead, tbody {
-                display: table;
-                width: 100%;
-            }
-            th, td {
-                padding: 8px 4px;
-                word-wrap: break-word;
-                white-space: normal;
-            }
-            /* Make team column narrower */
-            th:nth-child(1),
-            td:nth-child(1) {
-                min-width: 60px;
-            }
-            /* Time column (combined date+time) */
-            th:nth-child(2),
-            td:nth-child(2) {
-                min-width: 120px;
-            }
-            /* Location needs more space */
-            th:nth-child(3),
-            td:nth-child(3) {
-                min-width: 120px;
-                max-width: 180px;
-            }
-            /* Jersey column */
-            th:nth-child(4),
-            td:nth-child(4) {
-                min-width: 65px;
-            }
-            /* Opponent needs space */
-            th:nth-child(5),
-            td:nth-child(5) {
-                min-width: 100px;
-                max-width: 150px;
-            }
-            /* Score column */
-            th:nth-child(6),
-            td:nth-child(6) {
-                min-width: 40px;
-            }
-            .team-badge {
-                font-size: 0.85em;
-                padding: 3px 5px;
-            }
-        }
-        @media (max-width: 480px) {
-            body {
-                margin: 5px;
-            }
-            table {
-                font-size: 0.65em;
-            }
-            th, td {
-                padding: 6px 3px;
-            }
-            .team-badge {
-                font-size: 0.8em;
-                padding: 2px 4px;
-            }
-            .filter-btn {
-                padding: 5px 8px;
-                font-size: 0.8em;
-            }
-            tr.note-row td {
-            		text-align: justify;
-            }
-        }
-    </style>
-</head>
-<body>
-    <h1>⚡️ ` + pageTitle + `</h1>
-    <p id="lastUpdated" style="text-align: center; color: #999; font-size: 0.75rem; margin: -10px 0 20px 0;" data-utc="` +
-		now.Format(time.RFC3339) + `">Last updated on ` + now.Format("1/2/06") + ` at ` + now.Format("3:04PM") + ` UTC</p>
-    <div class="filter-buttons">
-`)
-
-	// All Teams button
-	activeClass := ""
-	activeStyle := ""
-	if filterTeam == "" {
-		activeClass = "active"
-		activeStyle = "background-color: #fbcb44 !important; color: black !important;"
-	}
+	// Prepare team buttons
+	var teamButtons []TeamButton
 	linkHref := "./"
 	if filterTeam != "" {
 		linkHref = "../"
 	}
-	html.WriteString(fmt.Sprintf(`        <a href="%s" class="filter-btn %s" style="%s text-decoration: none; display: inline-block;">All Teams</a>
-`, linkHref, activeClass, activeStyle))
 
-	// Add filter buttons for each team
 	for _, team := range teams {
 		teamColor := teamColorMap[team]
 		textColor := getTeamTextColor(teamColor)
@@ -1109,54 +910,37 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			borderStyle = " border: 1px solid black;"
 		}
 		teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", ""))
-		activeClass := ""
-		activeStyle := ""
-		if filterTeam == team {
-			activeClass = "active"
-			activeStyle = fmt.Sprintf("background-color: %s !important; color: %s !important;%s", teamColor, textColor, borderStyle)
-		}
 		teamLink := teamSlug + "/"
 		if filterTeam != "" {
 			teamLink = "../" + teamSlug + "/"
 		}
-		html.WriteString(fmt.Sprintf(`        <a href="%s" class="filter-btn %s" style="%s text-decoration: none; display: inline-block;">%s</a>
-`, teamLink, activeClass, activeStyle, team))
+		teamButtons = append(teamButtons, TeamButton{
+			Name:        team,
+			Link:        teamLink,
+			Color:       teamColor,
+			TextColor:   textColor,
+			BorderStyle: borderStyle,
+			IsActive:    filterTeam == team,
+		})
 	}
 
-	html.WriteString(`    </div>
-    <table id="scheduleTable">
-        <thead>
-            <tr>
-                <th>Team</th>
-                <th>Time</th>
-                <th>Location</th>
-                <th>Jersey</th>
-                <th>Opponent</th>
-                <th>Score</th>
-            </tr>
-        </thead>
-        <tbody>
-`)
-
-	// Iterate through schedule items (games and notes)
+	// Prepare template schedule items
+	var templateItems []TemplateScheduleItem
 	for i, item := range scheduleItems {
 		if item.IsNote {
-			// Render note row
-			html.WriteString(fmt.Sprintf(`            <tr class="note-row">
-                <td colspan="6">%s</td>
-            </tr>
-`, item.Note.Text))
+			templateItems = append(templateItems, TemplateScheduleItem{
+				IsNote: true,
+				Note:   item.Note,
+			})
 			continue
 		}
 
-		// Render game row
 		game := item.Game
 
 		// Determine if this is the first game of a new calendar week
 		isWeekStart := false
 		currentDate := parseDateForSorting(game.Date)
 		if currentDate.Year() != 2099 {
-			// Check if this is the first item or first game
 			if i == 0 {
 				isWeekStart = true
 			} else {
@@ -1164,11 +948,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 				for j := i - 1; j >= 0; j-- {
 					if !scheduleItems[j].IsNote {
 						prevDate := parseDateForSorting(scheduleItems[j].Game.Date)
-						// Get the ISO week year and week number for both dates
 						currentYear, currentWeek := currentDate.ISOWeek()
 						prevYear, prevWeek := prevDate.ISOWeek()
-
-						// If they're in different weeks, this is the first game of a new week
 						if currentYear != prevYear || currentWeek != prevWeek {
 							isWeekStart = true
 						}
@@ -1202,37 +983,20 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			jerseyText = "⬛️"
 		}
 
-		// Get team color and text color
-		teamColor := game.Color
-		textColor := getTeamTextColor(teamColor)
-		borderStyle := ""
-		if teamColor == "#FFFFFF" {
-			borderStyle = " border: 1px solid black;"
-		}
-
 		// Get location display
 		locationDisplay := getLocationDisplay(game.Location)
-		var locationHTML string
+		var locationHTML template.HTML
 
 		if locationDisplay.Abbr == "" {
-			// No abbreviation - show full location without tooltip
-			locationHTML = locationDisplay.TooltipText
+			locationHTML = template.HTML(locationDisplay.TooltipText)
 		} else if locationDisplay.CourtGym != "" {
-			// Has abbreviation and court/gym info
-			locationHTML = fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span> (%s)`,
-				locationDisplay.Abbr, locationDisplay.TooltipText, locationDisplay.CourtGym)
+			locationHTML = template.HTML(fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span> (%s)`,
+				locationDisplay.Abbr, locationDisplay.TooltipText, locationDisplay.CourtGym))
 		} else if locationDisplay.Abbr != locationDisplay.TooltipText {
-			// Has abbreviation but no court/gym
-			locationHTML = fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span>`,
-				locationDisplay.Abbr, locationDisplay.TooltipText)
+			locationHTML = template.HTML(fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span>`,
+				locationDisplay.Abbr, locationDisplay.TooltipText))
 		} else {
-			// Same value for both - no tooltip needed
-			locationHTML = locationDisplay.Abbr
-		}
-
-		weekStartClass := ""
-		if isWeekStart {
-			weekStartClass = " week-start"
+			locationHTML = template.HTML(locationDisplay.Abbr)
 		}
 
 		opponent := game.Opponent
@@ -1244,97 +1008,51 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			score = ""
 		}
 
-		// Check if game is in the past (has a score with W/L indicator)
-		pastGameClass := ""
-		if strings.HasPrefix(game.Score, "W ") || strings.HasPrefix(game.Score, "L ") {
-			pastGameClass = " past-game"
+		// Check if game is in the past
+		isPastGame := strings.HasPrefix(game.Score, "W ") || strings.HasPrefix(game.Score, "L ")
+
+		// Set game text color and border style for template
+		game.TextColor = getTeamTextColor(game.Color)
+		game.BorderStyle = ""
+		if game.Color == "#FFFFFF" {
+			game.BorderStyle = " border: 1px solid black;"
 		}
 
-		html.WriteString(fmt.Sprintf(`            <tr class="game-row%s%s" data-team="%s">
-                <td><span class="team-badge" style="background-color: %s; color: %s;%s">%s</span></td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-                <td>%s</td>
-            </tr>
-`, weekStartClass, pastGameClass, game.Team, teamColor, textColor, borderStyle, game.Team, displayDateTime, locationHTML, jerseyText, opponent, score))
+		templateItems = append(templateItems, TemplateScheduleItem{
+			IsNote:          false,
+			IsWeekStart:     isWeekStart,
+			IsPastGame:      isPastGame,
+			Game:            game,
+			DisplayDateTime: displayDateTime,
+			LocationHTML:    locationHTML,
+			JerseyText:      jerseyText,
+			OpponentDisplay: opponent,
+			ScoreDisplay:    score,
+		})
 	}
 
-	html.WriteString(`        </tbody>
-    </table>
-    <script>
-        // Convert UTC timestamp to Central Time
-        document.addEventListener('DOMContentLoaded', function() {
-            const lastUpdatedEl = document.getElementById('lastUpdated');
-            if (lastUpdatedEl) {
-                const utcTime = lastUpdatedEl.getAttribute('data-utc');
-                if (utcTime) {
-                    try {
-                        const date = new Date(utcTime);
-                        // Format in Central Time (America/Chicago)
-                        const options = {
-                            timeZone: 'America/Chicago',
-                            month: 'numeric',
-                            day: 'numeric',
-                            year: '2-digit',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                        };
-                        const formatter = new Intl.DateTimeFormat('en-US', options);
-                        const parts = formatter.formatToParts(date);
+	// Prepare template data
+	data := TemplateData{
+		PageTitle:      pageTitle,
+		UpdatedUTC:     now.Format(time.RFC3339),
+		UpdatedDisplay: now.Format("1/2/06") + " at " + now.Format("3:04PM") + " UTC",
+		AllTeamsLink:   linkHref,
+		IsAllTeams:     filterTeam == "",
+		Teams:          teamButtons,
+		ScheduleItems:  templateItems,
+	}
 
-                        const month = parts.find(p => p.type === 'month').value;
-                        const day = parts.find(p => p.type === 'day').value;
-                        const year = parts.find(p => p.type === 'year').value;
-                        const hour = parts.find(p => p.type === 'hour').value;
-                        const minute = parts.find(p => p.type === 'minute').value;
-                        const dayPeriod = parts.find(p => p.type === 'dayPeriod').value;
-
-                        lastUpdatedEl.textContent = 'Last updated on ' + month + '/' + day + '/' + year +
-                            ' at ' + hour + ':' + minute + dayPeriod;
-                    } catch (e) {
-                        // Keep the UTC fallback if conversion fails
-                    }
-                }
-            }
-
-            // Handle tooltip clicks on mobile devices
-            const locationWrappers = document.querySelectorAll('.location-wrapper');
-
-            locationWrappers.forEach(function(wrapper) {
-                wrapper.addEventListener('click', function(e) {
-                    e.stopPropagation();
-
-                    // Close all other open tooltips
-                    locationWrappers.forEach(function(otherWrapper) {
-                        if (otherWrapper !== wrapper) {
-                            otherWrapper.classList.remove('active');
-                        }
-                    });
-
-                    // Toggle this tooltip
-                    wrapper.classList.toggle('active');
-                });
-            });
-
-            // Close tooltips when clicking outside
-            document.addEventListener('click', function() {
-                locationWrappers.forEach(function(wrapper) {
-                    wrapper.classList.remove('active');
-                });
-            });
-        });
-    </script>
-</body>
-</html>
-`)
-
-	// Write to file
-	err := os.WriteFile(outputFile, []byte(html.String()), 0644)
+	// Create output file
+	f, err := os.Create(outputFile)
 	if err != nil {
-		return fmt.Errorf("error writing file: %v", err)
+		return fmt.Errorf("error creating file: %v", err)
+	}
+	defer f.Close()
+
+	// Execute template
+	err = tmpl.Execute(f, data)
+	if err != nil {
+		return fmt.Errorf("error executing template: %v", err)
 	}
 
 	return nil
