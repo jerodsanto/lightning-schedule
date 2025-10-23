@@ -9,7 +9,7 @@
     <meta name="theme-color" content="#fbcb44" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="/styles.css" />
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -44,12 +44,14 @@
   </head>
   <body>
     <h1>⚡️ {{.PageTitle}}</h1>
+
     <p class="info">
       as of
       <span id="lastUpdated" data-utc="{{.UpdatedUTC}}"
         >{{.UpdatedDisplay}}</span
       >
     </p>
+
     <div class="filter-buttons">
       <a
         href="{{.AllTeamsLink}}"
@@ -67,43 +69,46 @@
       {{end}}
       <button id="onlyUpcoming" class="filter-btn">Only Upcoming</button>
     </div>
-    <table id="scheduleTable">
-      <thead>
-        <tr>
-          <th>Team</th>
-          <th>Time</th>
-          <th>Location</th>
-          <th>Jersey</th>
-          <th>Opponent</th>
-          <th>Score</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{range .ScheduleItems}} {{if .IsNote}}
-        <tr class="note-row">
-          <td colspan="6">{{.Note.HTMLText}}</td>
-        </tr>
-        {{else}}
-        <tr
-          class="game-row{{if .IsWeekStart}} week-start{{end}}{{if .IsPastGame}} past-game{{end}}"
-          data-team="{{.Game.Team}}"
-        >
-          <td>
-            <span
-              class="team-badge"
-              style="background-color: {{.Game.Color}}; color: {{.Game.TextColor}};{{.Game.BorderStyle}}"
-              >{{.Game.Team}}</span
-            >
-          </td>
-          <td>{{.DisplayDateTime}}</td>
-          <td>{{.LocationHTML}}</td>
-          <td>{{.JerseyText}}</td>
-          <td>{{.OpponentDisplay}}</td>
-          <td>{{.ScoreDisplay}}</td>
-        </tr>
-        {{end}} {{end}}
-      </tbody>
-    </table>
+
+    <div class="schedule">
+      <table>
+        <thead>
+          <tr>
+            <th>Team</th>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Jersey</th>
+            <th>Opponent</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{range .ScheduleItems}} {{if .IsNote}}
+          <tr class="note-row">
+            <td colspan="6">{{.Note.HTMLText}}</td>
+          </tr>
+          {{else}}
+          <tr
+            class="game-row{{if .IsWeekStart}} week-start{{end}}{{if .IsPastGame}} past-game{{end}}"
+            data-team="{{.Game.Team}}"
+          >
+            <td>
+              <span
+                class="team-badge"
+                style="background-color: {{.Game.Color}}; color: {{.Game.TextColor}};{{.Game.BorderStyle}}"
+                >{{.Game.Team}}</span
+              >
+            </td>
+            <td>{{.DisplayDateTime}}</td>
+            <td>{{.LocationHTML}}</td>
+            <td>{{.JerseyText}}</td>
+            <td>{{.OpponentDisplay}}</td>
+            <td>{{.ScoreDisplay}}</td>
+          </tr>
+          {{end}} {{end}}
+        </tbody>
+      </table>
+    </div>
 
     <script>
       // Auto-refresh when returning to standalone app (iOS home screen app)
