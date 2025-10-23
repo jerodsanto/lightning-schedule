@@ -1,0 +1,241 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 20px;
+  background-color: #f5f5f5;
+}
+h1 {
+  color: #333;
+  text-align: center;
+}
+p.info {
+  text-align: center;
+  color: #999;
+  font-size: 0.75rem;
+  margin: -10px 0 20px 0;
+}
+.filter-buttons {
+  text-align: center;
+  margin: 10px 0;
+}
+.filter-btn {
+  padding: 8px 16px;
+  margin: 4px;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+  background-color: #999;
+  color: white;
+  text-decoration: none;
+  display: inline-block;
+  transition: all 0.2s;
+}
+.filter-btn.active {
+  color: black;
+  background-color: #fbcb44 !important;
+}
+.filter-btn:hover {
+  background-color: #777;
+}
+table {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  border-collapse: collapse;
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 15px;
+}
+th {
+  background-color: #fbcb44;
+  color: black;
+  padding: 12px;
+  text-align: left;
+}
+td {
+  padding: 10px;
+  border-bottom: 1px solid #ddd;
+}
+tr.week-start td {
+  border-top: 2px solid #fbcb44;
+}
+tr:hover {
+  background-color: #f5f5f5;
+}
+tr.past-game {
+  background-color: #f9f9f9;
+}
+tr.past-game:hover {
+  background-color: #e8e8e8;
+}
+tr.note-row td {
+  background-color: #f0f0f0;
+  color: black;
+  text-align: center;
+  font-weight: bold;
+  border-bottom: 2px solid #ddd;
+}
+tr.note-row a {
+  color: black;
+  text-decoration: underline;
+}
+tr.note-row a:hover {
+  color: #004499;
+}
+.team-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background-color: #2196f3;
+  color: black;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.location-wrapper {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+.location-abbr {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #999;
+}
+.location-tooltip {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  z-index: 1000;
+  background-color: #333;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  white-space: nowrap;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  transition: opacity 0.3s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+.location-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #333 transparent transparent transparent;
+}
+.location-wrapper:hover .location-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+.location-wrapper.active .location-tooltip {
+  visibility: visible;
+  opacity: 1;
+}
+@media (max-width: 768px) {
+  body {
+    margin: 10px;
+  }
+  h1 {
+    font-size: 1.5em;
+  }
+  .filter-buttons {
+    margin: 15px 0;
+  }
+  .filter-btn {
+    padding: 6px 10px;
+    font-size: 0.85em;
+    margin: 2px;
+  }
+  table {
+    font-size: 0.7em;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  thead {
+    display: table;
+    width: 100%;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  tbody {
+    display: table;
+    width: 100%;
+  }
+  th,
+  td {
+    padding: 8px 4px;
+    word-wrap: break-word;
+    white-space: normal;
+  }
+  /* Make team column narrower */
+  th:nth-child(1),
+  td:nth-child(1) {
+    min-width: 60px;
+  }
+  /* Time column (combined date+time) */
+  th:nth-child(2),
+  td:nth-child(2) {
+    min-width: 120px;
+  }
+  /* Location needs more space */
+  th:nth-child(3),
+  td:nth-child(3) {
+    min-width: 120px;
+    max-width: 180px;
+  }
+  /* Jersey column */
+  th:nth-child(4),
+  td:nth-child(4) {
+    min-width: 65px;
+  }
+  /* Opponent needs space */
+  th:nth-child(5),
+  td:nth-child(5) {
+    min-width: 100px;
+    max-width: 150px;
+  }
+  /* Score column */
+  th:nth-child(6),
+  td:nth-child(6) {
+    min-width: 40px;
+  }
+  .team-badge {
+    font-size: 0.85em;
+    padding: 3px 5px;
+  }
+}
+@media (max-width: 480px) {
+  body {
+    margin: 5px;
+  }
+  table {
+    font-size: 0.65em;
+  }
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  th,
+  td {
+    padding: 6px 3px;
+  }
+  .team-badge {
+    font-size: 0.8em;
+    padding: 2px 4px;
+  }
+  .filter-btn {
+    padding: 5px 8px;
+    font-size: 0.8em;
+  }
+  tr.note-row td {
+    text-align: left;
+    font-size: smaller;
+  }
+}

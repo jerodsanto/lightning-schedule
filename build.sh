@@ -15,3 +15,6 @@ magick ${SRC}/${ICON} -resize 512x512 ${DST}/android-chrome-512x512.png
 magick ${SRC}/${FAVICON} -resize 16x16 ${DST}/favicon-16x16.png
 magick ${SRC}/${FAVICON} -resize 32x32 ${DST}/favicon-32x32.png
 magick ${SRC}/${FAVICON} -define icon:auto-resize=64,48,32,16 ${DST}/favicon.ico
+
+cp static/* dist
+go run generate.go
