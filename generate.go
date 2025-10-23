@@ -23,16 +23,12 @@ import (
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
-// Google Sheet ID for additional games
+const domain = "schedule.omahalightningbasketball.com"
+
 const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
+const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
+const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
 
-var googleSheetCSVURL = fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv", googleSheetID)
-
-// Notes sheet gid
-var googleSheetNotesCSVURL = fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=436458989", googleSheetID)
-
-// Location abbreviations
-// Maps base location names (without court/gym) to shorter versions
 var locationAbbreviations = map[string]string{
 	"UBT South Sports Complex (Attack-Elite)": "UBT South",
 	"Trinity Classical Academy":               "TCA",
@@ -651,7 +647,9 @@ type TemplateScheduleItem struct {
 }
 
 type TemplateData struct {
+	ProdDomain     string
 	PageTitle      string
+	PagePath       string
 	UpdatedUTC     string
 	UpdatedDisplay string
 	AllTeamsLink   string
@@ -828,25 +826,22 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 
 	now := time.Now().UTC()
 
-	// Determine page title and heading based on filter
-	pageTitle := "Lightning Game Schedule"
+	// Determine page title and path based on filter
+	pageTitle := "Lightning"
+	pagePath := "/"
+
 	if filterTeam != "" {
-		pageTitle = filterTeam + " Game Schedule"
+		pageTitle = filterTeam
+		pagePath = "/" + getTeamSlug(filterTeam) + "/"
 	}
 
 	// Prepare team buttons
 	var teamButtons []TeamButton
-	linkHref := "./"
-	if filterTeam != "" {
-		linkHref = "../"
-	}
 
 	for _, team := range teams {
 		teamSlug := getTeamSlug(team)
-		teamLink := teamSlug + "/"
-		if filterTeam != "" {
-			teamLink = "../" + teamSlug + "/"
-		}
+		teamLink := "/" + teamSlug + "/"
+
 		teamButtons = append(teamButtons, TeamButton{
 			Name:     team,
 			Link:     teamLink,
@@ -958,9 +953,10 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	// Prepare template data
 	data := TemplateData{
 		PageTitle:      pageTitle,
+		PagePath:       pagePath,
+		ProdDomain:     domain,
 		UpdatedUTC:     now.Format(time.RFC3339),
 		UpdatedDisplay: now.Format("1/2/06") + " at " + now.Format("3:04PM") + " UTC",
-		AllTeamsLink:   linkHref,
 		IsAllTeams:     filterTeam == "",
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,

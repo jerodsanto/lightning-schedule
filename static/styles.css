@@ -7,7 +7,7 @@ h1 {
   color: #333;
   text-align: center;
 }
-p.info {
+.info {
   text-align: center;
   color: #999;
   font-size: 0.75rem;
@@ -89,18 +89,11 @@ th:nth-child(6),
 td:nth-child(6) {
   min-width: 45px;
 }
-
 tr.week-start td {
   border-top: 2px solid #fbcb44;
 }
-tr:hover {
-  background-color: #f5f5f5;
-}
 tr.past-game {
   background-color: #f9f9f9;
-}
-tr.past-game:hover {
-  background-color: #e8e8e8;
 }
 tr.note-row td {
   background-color: #f0f0f0;
@@ -205,6 +198,22 @@ tr.note-row a:hover {
 .location-wrapper.active .location-tooltip {
   visibility: visible;
   opacity: 1;
+}
+.calendar {
+  margin: 30px 0;
+}
+.calendar {
+  text-align: center;
+}
+.calendar li {
+  list-style-type: none;
+  padding: 8px 0;
+}
+.calendar a {
+  color: black;
+}
+.calendar a:hover {
+  text-decoration: none;
 }
 /* tablets */
 @media (max-width: 768px) {
