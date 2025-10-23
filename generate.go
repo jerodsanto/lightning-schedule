@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -20,6 +19,7 @@ import (
 )
 
 // Embed the template file into the binary
+//
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
@@ -52,64 +52,58 @@ var locationAbbreviations = map[string]string{
 type TeamInfo struct {
 	URL      string
 	HTMLName string
-	Color    string
+	CssClass string
 }
 
 // Team URLs - Add more teams here
-// Format: displayName: { URL: "...", HTMLName: "exact name as it appears in the HTML", Color: "#RRGGBB" }
 var teamURLs = map[string]TeamInfo{
 	"Varsity": {
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
-		Color:    "#f59c44", // orange
+		CssClass: "varsity",
 	},
 	"JV": {
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
-		Color:    "#44a15b", // green
+		CssClass: "jv",
 	},
 	"14U Gold": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
 		HTMLName: "Omaha Lightning Gold 8th",
-		Color:    "#FFD700",
+		CssClass: "gold",
 	},
 	"14U White": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h20250803221620558cb62c45d697d46",
 		HTMLName: "Omaha Lightning White 8th",
-		Color:    "#FFFFFF",
+		CssClass: "white",
 	},
 	"12U Blue": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263029c941335204c&IDTeam=h20250803221620486ddba884e17c748",
 		HTMLName: "Omaha Lightning Blue 6th",
-		Color:    "#5b9de9",
+		CssClass: "blue",
 	},
 	"10U Red": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263e6b6d69f385c49&IDTeam=h202508032216206132b484a6720f345",
 		HTMLName: "Omaha Lightning Red 4th",
-		Color:    "#d53a44",
+		CssClass: "red",
 	},
 	"10U Black": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263934d14719c5d45&IDTeam=h202508032216205157e930ef2d5314d",
 		HTMLName: "Omaha Lightning Black 3rd",
-		Color:    "#000000",
+		CssClass: "black",
 	},
 }
 
-// Default team color for teams not in teamURLs
-const defaultTeamColor = "#2196F3"
-
 // Game represents a single game
 type Game struct {
-	Team        string
-	Date        string
-	Time        string
-	Location    string
-	Opponent    string
-	HomeAway    string
-	Score       string
-	Color       string
-	TextColor   string
-	BorderStyle string
+	Team     string
+	Date     string
+	Time     string
+	Location string
+	Opponent string
+	HomeAway string
+	Score    string
+	CssClass string
 }
 
 // Note represents a note to display on a specific date
@@ -127,68 +121,16 @@ type ScheduleItem struct {
 	Note   *Note
 }
 
-// getTeamColor returns the team color or default
-func getTeamColor(teamName string) string {
-	if teamInfo, ok := teamURLs[teamName]; ok {
-		return teamInfo.Color
-	}
-	return defaultTeamColor
+func getTeamSlug(teamName string) string {
+	return strings.ToLower(strings.ReplaceAll(teamName, " ", ""))
 }
 
-// getTeamTextColor returns white for dark backgrounds, black for light backgrounds
-// Uses relative luminance calculation (WCAG formula)
-func getTeamTextColor(backgroundColor string) string {
-	normalizedColor := strings.ToLower(backgroundColor)
-
-	// Parse the color to RGB values
-	var r, g, b int
-
-	// Handle hex colors (#RRGGBB or #RGB)
-	if strings.HasPrefix(normalizedColor, "#") {
-		hex := normalizedColor[1:]
-		if len(hex) == 6 {
-			r64, _ := strconv.ParseInt(hex[0:2], 16, 64)
-			g64, _ := strconv.ParseInt(hex[2:4], 16, 64)
-			b64, _ := strconv.ParseInt(hex[4:6], 16, 64)
-			r, g, b = int(r64), int(g64), int(b64)
-		} else if len(hex) == 3 {
-			r64, _ := strconv.ParseInt(string(hex[0])+string(hex[0]), 16, 64)
-			g64, _ := strconv.ParseInt(string(hex[1])+string(hex[1]), 16, 64)
-			b64, _ := strconv.ParseInt(string(hex[2])+string(hex[2]), 16, 64)
-			r, g, b = int(r64), int(g64), int(b64)
-		}
-	}
-
-	// Calculate relative luminance using WCAG formula
-	// https://www.w3.org/TR/WCAG20/#relativeluminancedef
-	rsRGB := float64(r) / 255.0
-	gsRGB := float64(g) / 255.0
-	bsRGB := float64(b) / 255.0
-
-	var rLinear, gLinear, bLinear float64
-	if rsRGB <= 0.03928 {
-		rLinear = rsRGB / 12.92
+func getTeamCssClass(teamName string) string {
+	if teamInfo, exists := teamURLs[teamName]; exists {
+		return teamInfo.CssClass
 	} else {
-		rLinear = math.Pow((rsRGB+0.055)/1.055, 2.4)
+		return "unknown"
 	}
-	if gsRGB <= 0.03928 {
-		gLinear = gsRGB / 12.92
-	} else {
-		gLinear = math.Pow((gsRGB+0.055)/1.055, 2.4)
-	}
-	if bsRGB <= 0.03928 {
-		bLinear = bsRGB / 12.92
-	} else {
-		bLinear = math.Pow((bsRGB+0.055)/1.055, 2.4)
-	}
-
-	luminance := 0.2126*rLinear + 0.7152*gLinear + 0.0722*bLinear
-
-	// Use white text for dark colors (luminance < 0.5), black text for light colors
-	if luminance < 0.5 {
-		return "white"
-	}
-	return "black"
 }
 
 // fetchGoogleSheetGames fetches and parses games from Google Sheets
@@ -295,7 +237,7 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			Opponent: opponent,
 			HomeAway: homeAway,
 			Score:    score,
-			Color:    getTeamColor(team),
+			CssClass: getTeamCssClass(team),
 		})
 	}
 
@@ -407,7 +349,7 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 }
 
 // scrapeTeamSchedule scrapes schedule data for a single team
-func scrapeTeamSchedule(displayName, url, htmlName, color string) ([]Game, error) {
+func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, error) {
 	fmt.Printf("Scraping %s...\n", displayName)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -524,7 +466,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, color string) ([]Game, error
 					Opponent: opponent,
 					HomeAway: homeAway,
 					Score:    score,
-					Color:    color,
+					CssClass: CssClass,
 				})
 			}
 		})
@@ -689,25 +631,23 @@ func convertLinksToHTML(text string) string {
 
 // Template data structures
 type TeamButton struct {
-	Name        string
-	Link        string
-	Color       string
-	TextColor   string
-	BorderStyle string
-	IsActive    bool
+	Name     string
+	Link     string
+	CssClass string
+	IsActive bool
 }
 
 type TemplateScheduleItem struct {
-	IsNote           bool
-	IsWeekStart      bool
-	IsPastGame       bool
-	Game             *Game
-	Note             *Note
-	DisplayDateTime  string
-	LocationHTML     template.HTML
-	JerseyText       string
-	OpponentDisplay  string
-	ScoreDisplay     string
+	IsNote          bool
+	IsWeekStart     bool
+	IsPastGame      bool
+	Game            *Game
+	Note            *Note
+	DisplayDateTime string
+	LocationHTML    template.HTML
+	JerseyText      string
+	OpponentDisplay string
+	ScoreDisplay    string
 }
 
 type TemplateData struct {
@@ -886,12 +826,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		}
 	}
 
-	// Create a map of team names to colors
-	teamColorMap := make(map[string]string)
-	for _, game := range allGames {
-		teamColorMap[game.Team] = game.Color
-	}
-
 	now := time.Now().UTC()
 
 	// Determine page title and heading based on filter
@@ -908,24 +842,16 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	}
 
 	for _, team := range teams {
-		teamColor := teamColorMap[team]
-		textColor := getTeamTextColor(teamColor)
-		borderStyle := ""
-		if teamColor == "#FFFFFF" {
-			borderStyle = " border: 1px solid black;"
-		}
-		teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", ""))
+		teamSlug := getTeamSlug(team)
 		teamLink := teamSlug + "/"
 		if filterTeam != "" {
 			teamLink = "../" + teamSlug + "/"
 		}
 		teamButtons = append(teamButtons, TeamButton{
-			Name:        team,
-			Link:        teamLink,
-			Color:       teamColor,
-			TextColor:   textColor,
-			BorderStyle: borderStyle,
-			IsActive:    filterTeam == team,
+			Name:     team,
+			Link:     teamLink,
+			CssClass: getTeamCssClass(team),
+			IsActive: filterTeam == team,
 		})
 	}
 
@@ -1015,13 +941,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 
 		// Check if game is in the past
 		isPastGame := strings.HasPrefix(game.Score, "W ") || strings.HasPrefix(game.Score, "L ")
-
-		// Set game text color and border style for template
-		game.TextColor = getTeamTextColor(game.Color)
-		game.BorderStyle = ""
-		if game.Color == "#FFFFFF" {
-			game.BorderStyle = " border: 1px solid black;"
-		}
 
 		templateItems = append(templateItems, TemplateScheduleItem{
 			IsNote:          false,
@@ -1292,7 +1211,7 @@ func main() {
 	// Fetch games from team URLs (skip teams without URLs)
 	for displayName, teamInfo := range teamURLs {
 		if teamInfo.URL != "" {
-			games, err := scrapeTeamSchedule(displayName, teamInfo.URL, teamInfo.HTMLName, teamInfo.Color)
+			games, err := scrapeTeamSchedule(displayName, teamInfo.URL, teamInfo.HTMLName, teamInfo.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue

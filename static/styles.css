@@ -11,7 +11,7 @@ p.info {
   text-align: center;
   color: #999;
   font-size: 0.75rem;
-  margin: -10px 0 20px 0;
+  margin: -10px 0 10px 0;
 }
 .filter-buttons {
   text-align: center;
@@ -59,6 +59,37 @@ td {
   padding: 10px;
   border-bottom: 1px solid #ddd;
 }
+/* Team */
+th:nth-child(1),
+td:nth-child(1) {
+  min-width: 60px;
+}
+/* Time */
+th:nth-child(2),
+td:nth-child(2) {
+  min-width: 80px;
+}
+/* Location */
+th:nth-child(3),
+td:nth-child(3) {
+  min-width: 120px;
+}
+/* Jersey */
+th:nth-child(4),
+td:nth-child(4) {
+  min-width: 40px;
+}
+/* Opponent */
+th:nth-child(5),
+td:nth-child(5) {
+  min-width: 100px;
+}
+/* Score */
+th:nth-child(6),
+td:nth-child(6) {
+  min-width: 45px;
+}
+
 tr.week-start td {
   border-top: 2px solid #fbcb44;
 }
@@ -87,11 +118,48 @@ tr.note-row a:hover {
 }
 .team-badge {
   display: inline-block;
-  padding: 4px 8px;
+  padding: 4px 6px;
   background-color: #2196f3;
   color: black;
   border-radius: 4px;
   font-size: 0.9em;
+}
+
+/* Team-specific styles */
+.team-badge.varsity {
+  background-color: #f59c44;
+  color: black;
+}
+
+.team-badge.jv {
+  background-color: #44a15b;
+  color: white;
+}
+
+.team-badge.gold {
+  background-color: #ffd700;
+  color: black;
+}
+
+.team-badge.white {
+  background-color: #ffffff;
+  color: black;
+  border: 1px solid black;
+}
+
+.team-badge.blue {
+  background-color: #5b9de9;
+  color: white;
+}
+
+.team-badge.red {
+  background-color: #d53a44;
+  color: white;
+}
+
+.team-badge.black {
+  background-color: #000000;
+  color: white;
 }
 .location-wrapper {
   position: relative;
@@ -141,7 +209,7 @@ tr.note-row a:hover {
 /* tablets */
 @media (max-width: 768px) {
   body {
-    margin: 10px;
+    margin: 10px 0;
   }
   h1 {
     font-size: 1.5em;
@@ -163,47 +231,15 @@ tr.note-row a:hover {
     word-wrap: break-word;
     white-space: normal;
   }
-  /* Team */
-  th:nth-child(1),
-  td:nth-child(1) {
-    min-width: 60px;
-  }
-  /* Time */
-  th:nth-child(2),
-  td:nth-child(2) {
-    min-width: 120px;
-  }
-  /* Location */
-  th:nth-child(3),
-  td:nth-child(3) {
-    min-width: 120px;
-    max-width: 180px;
-  }
-  /* Jersey */
-  th:nth-child(4),
-  td:nth-child(4) {
-    min-width: 40px;
-  }
-  /* Opponent */
-  th:nth-child(5),
-  td:nth-child(5) {
-    min-width: 100px;
-    max-width: 150px;
-  }
-  /* Score */
-  th:nth-child(6),
-  td:nth-child(6) {
-    min-width: 45px;
-  }
   .team-badge {
     font-size: 0.85em;
-    padding: 3px 5px;
+    padding: 3px 4px;
   }
 }
 /* phones */
 @media (max-width: 480px) {
   body {
-    margin: 5px;
+    margin: 5px 0;
   }
   table {
     font-size: 0.65em;

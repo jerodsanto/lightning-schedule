@@ -56,14 +56,12 @@
       <a
         href="{{.AllTeamsLink}}"
         class="filter-btn{{if .IsAllTeams}} active{{end}}"
-        style="{{if .IsAllTeams}}background-color: #fbcb44 !important; color: black !important;{{end}}"
         >All Teams</a
       >
       {{range .Teams}}
       <a
         href="{{.Link}}"
-        class="filter-btn{{if .IsActive}} active{{end}}"
-        style="{{if .IsActive}}background-color: {{.Color}} !important; color: {{.TextColor}} !important;{{.BorderStyle}}{{end}}"
+        class="filter-btn {{.CssClass}}{{if .IsActive}} active{{end}}"
         >{{.Name}}</a
       >
       {{end}}
@@ -93,11 +91,7 @@
             data-team="{{.Game.Team}}"
           >
             <td>
-              <span
-                class="team-badge"
-                style="background-color: {{.Game.Color}}; color: {{.Game.TextColor}};{{.Game.BorderStyle}}"
-                >{{.Game.Team}}</span
-              >
+              <span class="team-badge {{.Game.CssClass}}">{{.Game.Team}}</span>
             </td>
             <td>{{.DisplayDateTime}}</td>
             <td>{{.LocationHTML}}</td>
