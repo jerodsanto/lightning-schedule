@@ -129,10 +129,7 @@ func getTeamCssClass(teamName string) string {
 	}
 }
 
-// fetchGoogleSheetGames fetches and parses games from Google Sheets
 func fetchGoogleSheetGames() ([]Game, error) {
-	fmt.Println("Fetching additional games from Google Sheet...")
-
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(googleSheetCSVURL)
 	if err != nil {
@@ -237,7 +234,6 @@ func fetchGoogleSheetGames() ([]Game, error) {
 		})
 	}
 
-	fmt.Printf("Found %d games in Google Sheet\n", len(games))
 	return games, nil
 }
 
@@ -270,10 +266,7 @@ func parseNoteTextWithLinks(text string) string {
 	return text
 }
 
-// fetchGoogleSheetNotes fetches and parses notes from Google Sheets
 func fetchGoogleSheetNotes() ([]Note, error) {
-	fmt.Println("Fetching notes from Google Sheet...")
-
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(googleSheetNotesCSVURL)
 	if err != nil {
@@ -340,14 +333,11 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 		})
 	}
 
-	fmt.Printf("Found %d notes in Google Sheet\n", len(notes))
 	return notes, nil
 }
 
 // scrapeTeamSchedule scrapes schedule data for a single team
 func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, error) {
-	fmt.Printf("Scraping %s...\n", displayName)
-
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	// Create request with browser-like headers to avoid Cloudflare blocking
@@ -468,7 +458,6 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 		})
 	})
 
-	fmt.Printf("Found %d games for %s\n", len(games), displayName)
 	return games, nil
 }
 
@@ -1200,8 +1189,6 @@ func stripHTMLTags(html string) string {
 }
 
 func main() {
-	fmt.Println("Starting schedule scraper...")
-
 	var allGames []Game
 
 	// Fetch games from team URLs (skip teams without URLs)
@@ -1224,6 +1211,13 @@ func main() {
 		allGames = append(allGames, sheetGames...)
 	}
 
+	if len(allGames) == 0 {
+		fmt.Println("No games found. Please check the URLs and try again.")
+		os.Exit(1)
+	}
+
+	fmt.Printf("%d games found\n", len(allGames))
+
 	// Fetch notes from Google Sheet
 	allNotes, err := fetchGoogleSheetNotes()
 	if err != nil {
@@ -1231,12 +1225,7 @@ func main() {
 		allNotes = []Note{} // Use empty slice if fetch fails
 	}
 
-	if len(allGames) == 0 {
-		fmt.Println("\nNo games found. Please check the URLs and try again.")
-		os.Exit(1)
-	}
-
-	fmt.Printf("\nTotal games found: %d\n", len(allGames))
+	fmt.Printf("%d notes found\n", len(allNotes))
 
 	// Get output directory from command line argument or use default "dist"
 	outputDir := "dist"
@@ -1274,7 +1263,6 @@ func main() {
 	}
 
 	// Generate combined iCal file
-	fmt.Println("Generating combined iCal file...")
 	err = generateICalendar(allGames, allNotes, filepath.Join(distDir, "schedule.ics"), "")
 	if err != nil {
 		fmt.Printf("Error generating combined iCal: %v\n", err)
@@ -1302,7 +1290,6 @@ func main() {
 		}
 
 		// Generate iCal for team
-		fmt.Printf("Generating iCal for %s...\n", team)
 		err = generateICalendar(allGames, allNotes, filepath.Join(teamDir, "schedule.ics"), team)
 		if err != nil {
 			fmt.Printf("Error generating iCal for %s: %v\n", team, err)
