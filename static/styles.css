@@ -200,14 +200,12 @@ tr.note-row a:hover {
   opacity: 1;
 }
 .calendar {
-  margin: 30px 0;
-}
-.calendar {
+  margin: 30px auto;
+  max-width: 400px;
   text-align: center;
 }
-.calendar li {
-  list-style-type: none;
-  padding: 8px 0;
+.calendar p.instructions {
+  font-style: italic;
 }
 .calendar a {
   color: black;

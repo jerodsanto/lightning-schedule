@@ -103,26 +103,24 @@
     </div>
 
     <div class="calendar">
-      <p>
-        📆 Add the {{.PageTitle}} game schedule to your calendar and it will stay
-        in sync with this page 👇
+      <p class="instructions">
+        Subscribe to this {{.PageTitle}} game schedule in your calendar app and
+        it will update as things change 👇
       </p>
       <p>
-        <ul>
-            <li>
-              <a href="webcal://{{.ProdDomain}}{{.PagePath}}schedule.ics"
-              >Apple Calendar</a
-            ></li>
-            <li>
-              <a href="https://www.google.com/calendar/render?cid=webcal://{{.ProdDomain}}{{.PagePath}}schedule.ics">
-              Google Calendar
-            </a></li>
-            <li>
-              <a href="https://outlook.live.com/owa?path=/calendar/action/compose&rru=addsubscription&url=https://{{.ProdDomain}}{{.PagePath}}schedule.ics&name={{.PageTitle}}">
-              Outlook Calendar
-              </a>
-            </li>
-          </ul>
+        <a href="webcal://{{.ProdDomain}}{{.PagePath}}schedule.ics"
+          >add to Apple</a
+        >
+        &nbsp;&bull;&nbsp;
+        <a
+          href="https://www.google.com/calendar/render?cid=webcal://{{.ProdDomain}}{{.PagePath}}schedule.ics"
+          >add to Google</a
+        >
+        &nbsp;&bull;&nbsp;
+        <a
+          href="https://outlook.live.com/owa?path=/calendar/action/compose&rru=addsubscription&url=https://{{.ProdDomain}}{{.PagePath}}schedule.ics&name={{.PageTitle}}"
+          >add to Outlook</a
+        >
       </p>
     </div>
     <script src="/schedule.js"></script>
