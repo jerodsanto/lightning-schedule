@@ -1226,16 +1226,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Printf("%d games found\n", len(allGames))
-
 	// Fetch notes from Google Sheet
 	allNotes, err := fetchGoogleSheetNotes()
 	if err != nil {
 		fmt.Printf("Error fetching notes from Google Sheet: %v\n", err)
 		allNotes = []Note{} // Use empty slice if fetch fails
 	}
-
-	fmt.Printf("%d notes found\n", len(allNotes))
 
 	// Get output directory from command line argument or use default "dist"
 	outputDir := "dist"
@@ -1306,5 +1302,5 @@ func main() {
 		}
 	}
 
-	fmt.Printf("\n✓ Done! Generated HTML and iCal files to %s\n", outputDir)
+	fmt.Printf("💪 Generated schedule with %d games and %d notes\n", len(allGames), len(allNotes))
 }
