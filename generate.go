@@ -23,6 +23,12 @@ import (
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
+//go:embed templates/schedule.css
+var stylesCSS string
+
+//go:embed templates/schedule.js
+var scheduleJS string
+
 const domain = "schedule.omahalightningbasketball.com"
 
 const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
@@ -645,6 +651,8 @@ type TemplateData struct {
 	IsAllTeams     bool
 	Teams          []TeamButton
 	ScheduleItems  []TemplateScheduleItem
+	StylesCSS      template.CSS
+	ScheduleJS     template.JS
 }
 
 // generateHTML generates HTML schedule page using templates
@@ -949,6 +957,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		IsAllTeams:     filterTeam == "",
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
+		StylesCSS:      template.CSS(stylesCSS),
+		ScheduleJS:     template.JS(scheduleJS),
 	}
 
 	// Create output file
