@@ -59,6 +59,13 @@ td {
   padding: 10px;
   border-bottom: 1px solid #ddd;
 }
+td a {
+  color: black;
+  text-decoration: underline;
+}
+td a:hover {
+  color: #004499;
+}
 /* Team */
 th:nth-child(1),
 td:nth-child(1) {
@@ -102,13 +109,6 @@ tr.note-row td {
   font-weight: bold;
   border-top: 2px solid #ddd;
   border-bottom: 2px solid #ddd;
-}
-tr.note-row a {
-  color: black;
-  text-decoration: underline;
-}
-tr.note-row a:hover {
-  color: #004499;
 }
 .team-badge {
   display: inline-block;

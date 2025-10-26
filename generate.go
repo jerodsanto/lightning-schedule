@@ -34,20 +34,114 @@ const domain = "schedule.omahalightningbasketball.com"
 const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
 const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
 const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
+const googleSheetLocationsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=1311642203"
 
-var locationAbbreviations = map[string]string{
-	"UBT South Sports Complex (Attack-Elite)": "UBT South",
-	"Trinity Classical Academy":               "TCA",
-	"Elkhorn North Ridge Middle School":       "ENRMS",
-	"Elkhorn Valley View Middle School":       "Valley View",
-	"Elkhorn Ridge Middle School":             "ERMS",
-	"Elkhorn Middle School":                   "Elkhorn Middle",
-	"Elkhorn Grandview Middle School":         "Grandview Middle",
-	"EPS Woodbrook Elementary":                "Woodbrook",
-	"EPS West Dodge Station Elementary":       "West Dodge Station",
-	"EPS Arbor View Elementary":               "Arbor View",
-	"Nebraska Basketball Academy":             "",
-	"Iowa West Fieldhouse":                    "",
+// Location represents a game location
+type Location struct {
+	Abbrev  string
+	Name    string
+	Address string
+}
+
+func fetchLocations() ([]Location, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(googleSheetLocationsCSVURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching locations sheet: %v", err)
+	}
+	defer resp.Body.Close()
+
+	reader := csv.NewReader(resp.Body)
+	var locations []Location
+
+	// Read header row
+	_, err = reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV header: %v", err)
+	}
+
+	// Parse data rows
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		// Expected columns: Abbreviation, Full Location Name, Address
+		if len(record) < 3 {
+			continue
+		}
+
+		abbreviation := strings.TrimSpace(record[0])
+		fullName := strings.TrimSpace(record[1])
+		address := strings.TrimSpace(record[2])
+
+		// Skip rows with missing data
+		if fullName == "" {
+			continue
+		}
+
+		locations = append(locations, Location{
+			Abbrev:  abbreviation,
+			Name:    fullName,
+			Address: address,
+		})
+	}
+
+	return locations, nil
+}
+
+var locations []Location
+
+// findLocationByName searches for a location by its full name
+// Returns the Location and any court/gym info after the hyphen
+func findLocationByName(name string) (*Location, string) {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "TBD" {
+		return nil, ""
+	}
+
+	// Strip out court/gym info if present (e.g., "Venue Name - Court 1" -> "Venue Name")
+	baseName := name
+	courtGymInfo := ""
+	if idx := strings.Index(name, " - "); idx != -1 {
+		baseName = strings.TrimSpace(name[:idx])
+		courtGymInfo = strings.TrimSpace(name[idx+3:])
+	}
+
+	for i := range locations {
+		if locations[i].Name == baseName {
+			return &locations[i], courtGymInfo
+		}
+	}
+	return nil, courtGymInfo
+}
+
+// findLocationByAbbrev searches for a location by its abbreviation
+// Returns the Location and any court/gym info after the hyphen
+func findLocationByAbbrev(abbrev string) (*Location, string) {
+	abbrev = strings.TrimSpace(abbrev)
+	if abbrev == "" || abbrev == "TBD" {
+		return nil, ""
+	}
+
+	// Strip out court/gym info if present
+	baseAbbrev := abbrev
+	courtGymInfo := ""
+	if idx := strings.Index(abbrev, " - "); idx != -1 {
+		baseAbbrev = strings.TrimSpace(abbrev[:idx])
+		courtGymInfo = strings.TrimSpace(abbrev[idx+3:])
+	}
+
+	for i := range locations {
+		if locations[i].Abbrev == baseAbbrev {
+			return &locations[i], courtGymInfo
+		}
+	}
+	return nil, courtGymInfo
 }
 
 // TeamInfo holds team configuration
@@ -98,15 +192,16 @@ var teamURLs = map[string]TeamInfo{
 
 // Game represents a single game
 type Game struct {
-	Team     string
-	Date     string
-	Time     string
-	Location string
-	Opponent string
-	HomeAway string
-	Score    string
-	Result   string // "W", "L", or "" for unplayed games
-	CssClass string
+	Team         string
+	Date         string
+	Time         string
+	Location     *Location
+	CourtGymInfo string // Court/Gym information (e.g., "court 1", "gym a")
+	Opponent     string
+	HomeAway     string
+	Score        string
+	Result       string // "W", "L", or "" for unplayed games
+	CssClass     string
 }
 
 // Note represents a note to display on a specific date
@@ -227,16 +322,20 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			}
 		}
 
+		// Find location by abbreviation (Google Sheets uses abbreviations)
+		loc, courtGymInfo := findLocationByAbbrev(location)
+
 		games = append(games, Game{
-			Team:     team,
-			Date:     formattedDate,
-			Time:     timeStr,
-			Location: location,
-			Opponent: opponent,
-			HomeAway: homeAway,
-			Score:    score,
-			Result:   result,
-			CssClass: getTeamCssClass(team),
+			Team:         team,
+			Date:         formattedDate,
+			Time:         timeStr,
+			Location:     loc,
+			CourtGymInfo: courtGymInfo,
+			Opponent:     opponent,
+			HomeAway:     homeAway,
+			Score:        score,
+			Result:       result,
+			CssClass:     getTeamCssClass(team),
 		})
 	}
 
@@ -453,16 +552,20 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 					return
 				}
 
+				// Find location by name (TourneyMachine uses full location names)
+				loc, courtGymInfo := findLocationByName(location)
+
 				games = append(games, Game{
-					Team:     displayName,
-					Date:     currentDate,
-					Time:     timeStr,
-					Location: location,
-					Opponent: opponent,
-					HomeAway: homeAway,
-					Score:    score,
-					Result:   result,
-					CssClass: CssClass,
+					Team:         displayName,
+					Date:         currentDate,
+					Time:         timeStr,
+					Location:     loc,
+					CourtGymInfo: courtGymInfo,
+					Opponent:     opponent,
+					HomeAway:     homeAway,
+					Score:        score,
+					Result:       result,
+					CssClass:     CssClass,
 				})
 			}
 		})
@@ -536,83 +639,6 @@ func formatTime(timeStr string) string {
 	}
 
 	return timeStr
-}
-
-// LocationDisplay holds location display information
-type LocationDisplay struct {
-	Abbr        string
-	CourtGym    string
-	TooltipText string
-}
-
-// getLocationDisplay returns abbreviated location with full name for tooltip
-func getLocationDisplay(location string) LocationDisplay {
-	if location == "" || location == "TBD" {
-		return LocationDisplay{
-			Abbr:        "TBD",
-			CourtGym:    "",
-			TooltipText: "TBD",
-		}
-	}
-
-	// Split on hyphen to separate main location from court/gym info
-	parts := strings.Split(location, " - ")
-
-	if len(parts) == 2 {
-		baseLocation := strings.TrimSpace(parts[0])
-		courtGymInfo := strings.ToLower(strings.TrimSpace(parts[1]))
-
-		// Check if abbreviation exists in the map
-		if abbreviated, ok := locationAbbreviations[baseLocation]; ok {
-			// If abbreviation is blank/empty, show full location without tooltip
-			if strings.TrimSpace(abbreviated) == "" {
-				return LocationDisplay{
-					Abbr:        "",
-					CourtGym:    "",
-					TooltipText: location,
-				}
-			}
-
-			// Return abbreviated location with separate court/gym info
-			return LocationDisplay{
-				Abbr:        abbreviated,
-				CourtGym:    courtGymInfo,
-				TooltipText: baseLocation,
-			}
-		}
-
-		// No abbreviation found in map, but still format with court/gym
-		return LocationDisplay{
-			Abbr:        baseLocation,
-			CourtGym:    courtGymInfo,
-			TooltipText: baseLocation,
-		}
-	}
-
-	// No hyphen separator - check if there's an abbreviation for the whole thing
-	if abbreviated, ok := locationAbbreviations[location]; ok {
-		// If abbreviation is blank/empty, show full location without tooltip
-		if strings.TrimSpace(abbreviated) == "" {
-			return LocationDisplay{
-				Abbr:        "",
-				CourtGym:    "",
-				TooltipText: location,
-			}
-		}
-
-		return LocationDisplay{
-			Abbr:        abbreviated,
-			CourtGym:    "",
-			TooltipText: location,
-		}
-	}
-
-	// If no abbreviation exists, use the full name for both
-	return LocationDisplay{
-		Abbr:        location,
-		CourtGym:    "",
-		TooltipText: location,
-	}
 }
 
 // convertLinksToHTML converts URLs in text to HTML anchor tags
@@ -926,20 +952,29 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			jerseyText = "⬛️"
 		}
 
-		// Get location display
-		locationDisplay := getLocationDisplay(game.Location)
+		// Generate location HTML with Google Maps link if address is available
 		var locationHTML template.HTML
+		if game.Location != nil {
+			var locDisplay string
+			if game.Location.Address != "" {
+				// Location has an address - make it a Google Maps link
+				mapsURL := "https://maps.google.com/?q=" +
+					strings.ReplaceAll(game.Location.Address, " ", "+")
+				locDisplay = fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`,
+					mapsURL, game.Location.Abbrev)
+			} else {
+				// Location has no address - just show the abbreviation
+				locDisplay = game.Location.Abbrev
+			}
 
-		if locationDisplay.Abbr == "" {
-			locationHTML = template.HTML(locationDisplay.TooltipText)
-		} else if locationDisplay.CourtGym != "" {
-			locationHTML = template.HTML(fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span> (%s)`,
-				locationDisplay.Abbr, locationDisplay.TooltipText, locationDisplay.CourtGym))
-		} else if locationDisplay.Abbr != locationDisplay.TooltipText {
-			locationHTML = template.HTML(fmt.Sprintf(`<span class="location-wrapper"><span class="location-abbr">%s</span><span class="location-tooltip">%s</span></span>`,
-				locationDisplay.Abbr, locationDisplay.TooltipText))
+			// Add court/gym info if present
+			if game.CourtGymInfo != "" {
+				locationHTML = template.HTML(fmt.Sprintf("%s (%s)", locDisplay, strings.ToLower(game.CourtGymInfo)))
+			} else {
+				locationHTML = template.HTML(locDisplay)
+			}
 		} else {
-			locationHTML = template.HTML(locationDisplay.Abbr)
+			locationHTML = template.HTML("TBD")
 		}
 
 		opponent := game.Opponent
@@ -1146,8 +1181,8 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		ical.WriteString("DESCRIPTION:" + escapeICalText(description) + "\r\n")
 
 		// Location
-		if game.Location != "" && game.Location != "TBD" {
-			ical.WriteString("LOCATION:" + escapeICalText(game.Location) + "\r\n")
+		if game.Location != nil {
+			ical.WriteString("LOCATION:" + escapeICalText(game.Location.Name) + "\r\n")
 		}
 
 		ical.WriteString("END:VEVENT\r\n")
@@ -1221,6 +1256,14 @@ func stripHTMLTags(html string) string {
 
 func main() {
 	var allGames []Game
+
+	// Fetch locations from Google Sheet
+	var err error
+	locations, err = fetchLocations()
+	if err != nil {
+		fmt.Printf("Error fetching locations: %v\n", err)
+		locations = []Location{} // Use empty slice if fetch fails
+	}
 
 	// Fetch games from team URLs (skip teams without URLs)
 	for displayName, teamInfo := range teamURLs {
