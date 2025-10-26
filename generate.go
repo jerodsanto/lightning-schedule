@@ -105,6 +105,7 @@ type Game struct {
 	Opponent string
 	HomeAway string
 	Score    string
+	Result   string // "W", "L", or "" for unplayed games
 	CssClass string
 }
 
@@ -210,22 +211,20 @@ func fetchGoogleSheetGames() ([]Game, error) {
 		}
 
 		// Parse score and add W/L if score is in format "ourScore-theirScore"
-		// and doesn't already have W/L indicator
-		if score != "" && score != "-" && !strings.Contains(score, "W") && !strings.Contains(score, "L") {
+		result := ""
+		if score != "" && score != "-" {
 			scoreParts := strings.Split(score, "-")
 			if len(scoreParts) == 2 {
 				ourScore, err1 := strconv.Atoi(strings.TrimSpace(scoreParts[0]))
 				theirScore, err2 := strconv.Atoi(strings.TrimSpace(scoreParts[1]))
 				if err1 == nil && err2 == nil {
 					if ourScore > theirScore {
-						score = fmt.Sprintf("%d-%d (W)", ourScore, theirScore)
+						result = "W"
 					} else {
-						score = fmt.Sprintf("%d-%d (L)", ourScore, theirScore)
+						result = "L"
 					}
 				}
 			}
-		} else if score == "" {
-			score = "-"
 		}
 
 		games = append(games, Game{
@@ -236,6 +235,7 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			Opponent: opponent,
 			HomeAway: homeAway,
 			Score:    score,
+			Result:   result,
 			CssClass: getTeamCssClass(team),
 		})
 	}
@@ -342,7 +342,6 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 	return notes, nil
 }
 
-// scrapeTeamSchedule scrapes schedule data for a single team
 func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 
@@ -414,6 +413,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 				opponent := ""
 				homeAway := ""
 				score := ""
+				result := ""
 
 				if visitor == htmlName {
 					opponent = home
@@ -423,10 +423,11 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 						ourScore, _ := strconv.Atoi(visitorScore)
 						theirScore, _ := strconv.Atoi(homeScore)
 						if ourScore > theirScore {
-							score = fmt.Sprintf("W %s-%s", visitorScore, homeScore)
+							result = "W"
 						} else {
-							score = fmt.Sprintf("L %s-%s", visitorScore, homeScore)
+							result = "L"
 						}
+						score = fmt.Sprintf("%s %s-%s", result, visitorScore, homeScore)
 					} else {
 						score = ""
 					}
@@ -439,8 +440,10 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 						theirScore, _ := strconv.Atoi(visitorScore)
 						if ourScore > theirScore {
 							score = fmt.Sprintf("W %s-%s", homeScore, visitorScore)
+							result = "W"
 						} else {
 							score = fmt.Sprintf("L %s-%s", homeScore, visitorScore)
+							result = "L"
 						}
 					} else {
 						score = ""
@@ -458,6 +461,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 					Opponent: opponent,
 					HomeAway: homeAway,
 					Score:    score,
+					Result:   result,
 					CssClass: CssClass,
 				})
 			}
@@ -649,6 +653,7 @@ type TemplateData struct {
 	UpdatedDisplay string
 	AllTeamsLink   string
 	IsAllTeams     bool
+	TeamRecord     string
 	Teams          []TeamButton
 	ScheduleItems  []TemplateScheduleItem
 	StylesCSS      template.CSS
@@ -826,10 +831,25 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	// Determine page title and path based on filter
 	pageTitle := "Lightning"
 	pagePath := "/"
+	teamRecord := ""
 
 	if filterTeam != "" {
 		pageTitle = filterTeam
 		pagePath = "/" + getTeamSlug(filterTeam) + "/"
+
+		// Calculate W-L record for team pages
+		wins := 0
+		losses := 0
+		for _, game := range gamesToDisplay {
+			if game.Result == "W" {
+				wins++
+			} else if game.Result == "L" {
+				losses++
+			}
+		}
+		if wins > 0 || losses > 0 {
+			teamRecord = fmt.Sprintf(" [%d-%d]", wins, losses)
+		}
 	}
 
 	// Prepare team buttons
@@ -932,7 +952,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		}
 
 		// Check if game is in the past
-		isPastGame := strings.HasPrefix(game.Score, "W ") || strings.HasPrefix(game.Score, "L ")
+		isPastGame := game.Result == "W" || game.Result == "L"
 
 		templateItems = append(templateItems, TemplateScheduleItem{
 			IsNote:          false,
@@ -955,6 +975,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		UpdatedUTC:     now.Format(time.RFC3339),
 		UpdatedDisplay: now.Format("1/2/06") + " at " + now.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == "",
+		TeamRecord:     teamRecord,
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
 		StylesCSS:      template.CSS(stylesCSS),
