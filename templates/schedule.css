@@ -293,6 +293,13 @@ tr.note-row td {
     color: #f5f5f5;
   }
 
+  td a {
+    color: #f5f5f5;
+  }
+  td a:hover {
+    color: #fbcb44;
+  }
+
   tr.week-start td {
     border-top: 2px solid #fbcb44;
   }
