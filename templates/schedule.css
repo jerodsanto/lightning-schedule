@@ -100,6 +100,7 @@ tr.note-row td {
   color: black;
   text-align: center;
   font-weight: bold;
+  border-top: 2px solid #ddd;
   border-bottom: 2px solid #ddd;
 }
 tr.note-row a {
@@ -213,6 +214,7 @@ tr.note-row a:hover {
 .calendar a:hover {
   text-decoration: none;
 }
+
 /* tablets */
 @media (max-width: 768px) {
   body {
@@ -266,5 +268,132 @@ tr.note-row a:hover {
   tr.note-row td {
     text-align: left;
     font-size: smaller;
+  }
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  body {
+    background-color: #1a1a1a;
+    color: #f5f5f5;
+  }
+
+  table {
+    background-color: #2d2d2d;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  th {
+    background-color: #fbcb44;
+    color: black;
+  }
+
+  td {
+    border-bottom: 1px solid #444;
+    color: #f5f5f5;
+  }
+
+  tr.week-start td {
+    border-top: 2px solid #fbcb44;
+  }
+
+  tr.past-game {
+    background-color: #252525;
+  }
+
+  tr.note-row td {
+    background-color: #555;
+    color: #f5f5f5;
+    border-top: 2px solid #333;
+    border-bottom: 2px solid #333;
+  }
+
+  tr.note-row a {
+    color: #fbcb44;
+  }
+
+  tr.note-row a:hover {
+    color: #ffd65f;
+  }
+
+  .filter-btn {
+    background-color: #555;
+    color: #f5f5f5;
+  }
+
+  .filter-btn:hover {
+    background-color: #666;
+  }
+
+  .filter-btn.active {
+    background-color: #fbcb44 !important;
+    color: black;
+  }
+
+  .info {
+    color: #888;
+  }
+
+  h1 {
+    color: #f5f5f5;
+  }
+
+  .calendar a {
+    color: #fbcb44;
+  }
+
+  .calendar a:hover {
+    color: #ffd65f;
+  }
+
+  .location-abbr {
+    text-decoration-color: #666;
+  }
+
+  .location-tooltip {
+    background-color: #444;
+    color: #f5f5f5;
+  }
+
+  .location-tooltip::after {
+    border-color: #444 transparent transparent transparent;
+  }
+
+  /* Team badge adjustments for dark mode */
+  .team-badge.varsity {
+    background-color: #f59c44;
+    color: black;
+  }
+
+  .team-badge.jv {
+    background-color: #44a15b;
+    color: white;
+  }
+
+  .team-badge.gold {
+    background-color: #ffd700;
+    color: black;
+  }
+
+  .team-badge.white {
+    background-color: #e8e8e8;
+    color: black;
+    border: 1px solid #666;
+  }
+
+  .team-badge.blue {
+    background-color: #5b9de9;
+    color: white;
+  }
+
+  .team-badge.red {
+    background-color: #d53a44;
+    color: white;
+  }
+
+  .team-badge.black {
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
   }
 }
