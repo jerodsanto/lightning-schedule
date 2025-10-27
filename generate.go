@@ -986,8 +986,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			score = ""
 		}
 
-		// Check if game is in the past
-		isPastGame := game.Result == "W" || game.Result == "L"
+		isPastGame := game.Result == "W" || game.Result == "L" || (dateObj.Year() != 2099 && dateObj.Before(now))
 
 		templateItems = append(templateItems, TemplateScheduleItem{
 			IsNote:          false,
