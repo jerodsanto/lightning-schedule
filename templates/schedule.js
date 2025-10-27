@@ -99,14 +99,28 @@ function applyFilters() {
   }
 }
 
+function throttle(fn, context) {
+  let frameId;
+  return function (...args) {
+    const contextBoundFn = fn.bind(context);
+    if (frameId) return;
+    frameId = requestAnimationFrame(() => {
+      contextBoundFn(...args);
+      frameId = null;
+    });
+  };
+}
+
 function syncTableHeaders() {
   const headerTable = document.querySelector(".schedule-header table");
   const bodyContainer = document.querySelector(".schedule-body");
 
-  // Sync horizontal scroll
-  bodyContainer.addEventListener("scroll", () => {
+  // Throttled sync for horizontal scroll (runs ~60 FPS max)
+  const throttledSync = throttle(() => {
     headerTable.style.transform = `translateX(-${bodyContainer.scrollLeft}px)`;
   });
+
+  bodyContainer.addEventListener("scroll", throttledSync);
 
   // Match column widths
   const headerThs = headerTable.querySelectorAll("th");
