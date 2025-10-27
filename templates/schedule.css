@@ -37,6 +37,12 @@ h1 {
   background-color: #777;
 }
 
+/* table container */
+.schedule {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 table {
   width: 100%;
   max-width: 1200px;
@@ -124,82 +130,32 @@ tr.note-row td {
   background-color: #f59c44;
   color: black;
 }
-
 .team-badge.jv {
   background-color: #44a15b;
   color: white;
 }
-
 .team-badge.gold {
   background-color: #ffd700;
   color: black;
 }
-
 .team-badge.white {
   background-color: #ffffff;
   color: black;
   border: 1px solid black;
 }
-
 .team-badge.blue {
   background-color: #5b9de9;
   color: white;
 }
-
 .team-badge.red {
   background-color: #d53a44;
   color: white;
 }
-
 .team-badge.black {
   background-color: #000000;
   color: white;
 }
-.location-wrapper {
-  position: relative;
-  display: inline-block;
-  cursor: help;
-}
-.location-abbr {
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-decoration-color: #999;
-}
-.location-tooltip {
-  visibility: hidden;
-  opacity: 0;
-  position: absolute;
-  z-index: 1000;
-  background-color: #333;
-  color: white;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 0.9em;
-  white-space: nowrap;
-  bottom: 125%;
-  left: 50%;
-  transform: translateX(-50%);
-  transition: opacity 0.3s;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-}
-.location-tooltip::after {
-  content: "";
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  margin-left: -5px;
-  border-width: 5px;
-  border-style: solid;
-  border-color: #333 transparent transparent transparent;
-}
-.location-wrapper:hover .location-tooltip {
-  visibility: visible;
-  opacity: 1;
-}
-.location-wrapper.active .location-tooltip {
-  visibility: visible;
-  opacity: 1;
-}
+
 .calendar {
   margin: 30px auto 60px auto;
   max-width: 400px;
@@ -351,19 +307,6 @@ tr.note-row td {
 
   .calendar a:hover {
     color: #ffd65f;
-  }
-
-  .location-abbr {
-    text-decoration-color: #666;
-  }
-
-  .location-tooltip {
-    background-color: #444;
-    color: #f5f5f5;
-  }
-
-  .location-tooltip::after {
-    border-color: #444 transparent transparent transparent;
   }
 
   /* Team badge adjustments for dark mode */
