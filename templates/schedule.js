@@ -3,7 +3,6 @@ if (window.matchMedia("(display-mode: standalone)").matches) {
   // Detect when page becomes visible (user returns to the app)
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
-      // Page is now visible - reload to get fresh data
       window.location.reload();
     }
   });
@@ -11,14 +10,12 @@ if (window.matchMedia("(display-mode: standalone)").matches) {
   // Also handle iOS-specific pageshow event (detects app resume from background)
   window.addEventListener("pageshow", function (event) {
     if (event.persisted) {
-      // Page was loaded from cache (user returned to app)
       window.location.reload();
     }
   });
 }
 
-// Convert UTC timestamp to Central Time
-document.addEventListener("DOMContentLoaded", function () {
+function handleTimestamps() {
   const lastUpdatedEl = document.getElementById("lastUpdated");
   if (lastUpdatedEl) {
     const utcTime = lastUpdatedEl.getAttribute("data-utc");
@@ -61,34 +58,9 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
   }
+}
 
-  // Handle tooltip clicks on mobile devices
-  const locationWrappers = document.querySelectorAll(".location-wrapper");
-
-  locationWrappers.forEach(function (wrapper) {
-    wrapper.addEventListener("click", function (e) {
-      e.stopPropagation();
-
-      // Close all other open tooltips
-      locationWrappers.forEach(function (otherWrapper) {
-        if (otherWrapper !== wrapper) {
-          otherWrapper.classList.remove("active");
-        }
-      });
-
-      // Toggle this tooltip
-      wrapper.classList.toggle("active");
-    });
-  });
-
-  // Close tooltips when clicking outside
-  document.addEventListener("click", function () {
-    locationWrappers.forEach(function (wrapper) {
-      wrapper.classList.remove("active");
-    });
-  });
-
-  // Handle "Only show upcoming" filter
+function applyFilters() {
   const onlyUpcomingEl = document.getElementById("onlyUpcoming");
 
   // Load saved preference from localStorage
@@ -125,4 +97,28 @@ document.addEventListener("DOMContentLoaded", function () {
       row.style.display = "";
     });
   }
-});
+}
+
+function syncTableHeaders() {
+  const headerTable = document.querySelector(".schedule-header table");
+  const bodyContainer = document.querySelector(".schedule-body");
+
+  // Sync horizontal scroll
+  bodyContainer.addEventListener("scroll", () => {
+    headerTable.style.transform = `translateX(-${bodyContainer.scrollLeft}px)`;
+  });
+
+  // Match column widths
+  const headerThs = headerTable.querySelectorAll("th");
+  const bodyThs = document.querySelectorAll(".body-table th");
+  headerThs.forEach((headerTh, i) => {
+    if (bodyThs[i]) {
+      headerTh.style.width = `${bodyThs[i].offsetWidth}px`;
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", applyFilters);
+document.addEventListener("DOMContentLoaded", handleTimestamps);
+document.addEventListener("DOMContentLoaded", syncTableHeaders);
+window.addEventListener("resize", syncTableHeaders);

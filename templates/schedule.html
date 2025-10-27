@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <style>
-{{.StylesCSS}}
+      {{.StylesCSS}}
     </style>
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -68,9 +68,24 @@
       <button id="onlyUpcoming" class="filter-btn">Only Upcoming</button>
     </div>
 
-    <div class="schedule">
+    <div class="schedule-header">
       <table>
         <thead>
+          <tr>
+            <th>Team</th>
+            <th>Time</th>
+            <th>Location</th>
+            <th>Jersey</th>
+            <th>Opponent</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+      </table>
+    </div>
+
+    <div class="schedule-body">
+      <table>
+        <thead style="display: none">
           <tr>
             <th>Team</th>
             <th>Time</th>
@@ -126,7 +141,7 @@
       </p>
     </div>
     <script>
-{{.ScheduleJS}}
+      {{.ScheduleJS}}
     </script>
   </body>
 </html>

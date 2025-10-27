@@ -38,7 +38,13 @@ h1 {
 }
 
 /* table container */
-.schedule {
+.schedule-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  overflow-x: hidden;
+}
+.schedule-body {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -57,9 +63,6 @@ th {
   color: black;
   padding: 12px;
   text-align: left;
-  position: sticky;
-  top: 0;
-  z-index: 10;
 }
 td {
   padding: 10px;
