@@ -149,6 +149,7 @@ type TeamInfo struct {
 	URL      string
 	HTMLName string
 	CssClass string
+	Order    int
 }
 
 // Team URLs - Add more teams here
@@ -157,36 +158,43 @@ var teamURLs = map[string]TeamInfo{
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
 		CssClass: "varsity",
+		Order:    1,
 	},
 	"JV": {
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
 		CssClass: "jv",
+		Order:    2,
 	},
 	"14U Gold": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
 		HTMLName: "Omaha Lightning Gold 8th",
 		CssClass: "gold",
+		Order:    3,
 	},
 	"14U White": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h20250803221620558cb62c45d697d46",
 		HTMLName: "Omaha Lightning White 8th",
 		CssClass: "white",
+		Order:    4,
 	},
 	"12U Blue": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263029c941335204c&IDTeam=h20250803221620486ddba884e17c748",
 		HTMLName: "Omaha Lightning Blue 6th",
 		CssClass: "blue",
+		Order:    5,
 	},
 	"10U Red": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263e6b6d69f385c49&IDTeam=h202508032216206132b484a6720f345",
 		HTMLName: "Omaha Lightning Red 4th",
 		CssClass: "red",
+		Order:    6,
 	},
 	"10U Black": {
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263934d14719c5d45&IDTeam=h202508032216205157e930ef2d5314d",
 		HTMLName: "Omaha Lightning Black 3rd",
 		CssClass: "black",
+		Order:    7,
 	},
 }
 
@@ -744,12 +752,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		})
 	}
 
-	// Define team order for sorting
-	teamOrderMap := map[string]int{
-		"Varsity": 1, "JV": 2, "14U Gold": 3, "14U White": 4,
-		"12U Blue": 5, "10U Red": 6, "10U Black": 7,
-	}
-
 	// Sort schedule items by date and time
 	sort.Slice(scheduleItems, func(i, j int) bool {
 		var dateA, dateB time.Time
@@ -803,8 +805,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 				return timeMinA < timeMinB
 			}
 			// Same time - sort by team order
-			orderA := teamOrderMap[gameA.Team]
-			orderB := teamOrderMap[gameB.Team]
+			orderA := teamURLs[gameA.Team].Order
+			orderB := teamURLs[gameB.Team].Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
@@ -813,8 +815,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 
 		if isTBDA && isTBDB {
 			// Both are TBD - group by team
-			orderA := teamOrderMap[gameA.Team]
-			orderB := teamOrderMap[gameB.Team]
+			orderA := teamURLs[gameA.Team].Order
+			orderB := teamURLs[gameB.Team].Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
@@ -825,32 +827,37 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		return !isTBDA
 	})
 
-	// Get unique teams in the order they appear in teamURLs
-	teamOrder := []string{"Varsity", "JV", "14U Gold", "14U White", "12U Blue", "10U Red", "10U Black"}
+	// Get unique teams and sort by their Order field in teamURLs
 	teamSet := make(map[string]bool)
 	for _, game := range allGames {
 		teamSet[game.Team] = true
 	}
 
 	var teams []string
-	for _, team := range teamOrder {
-		if teamSet[team] {
-			teams = append(teams, team)
-		}
-	}
-	// Add any teams not in the order list (alphabetically)
 	for team := range teamSet {
-		found := false
-		for _, t := range teams {
-			if t == team {
-				found = true
-				break
-			}
-		}
-		if !found {
-			teams = append(teams, team)
-		}
+		teams = append(teams, team)
 	}
+
+	// Sort teams by their Order field, with teams not in teamURLs map at the end
+	sort.Slice(teams, func(i, j int) bool {
+		infoI, hasI := teamURLs[teams[i]]
+		infoJ, hasJ := teamURLs[teams[j]]
+
+		// Both have order info - sort by order
+		if hasI && hasJ {
+			return infoI.Order < infoJ.Order
+		}
+		// Only i has order info - it comes first
+		if hasI {
+			return true
+		}
+		// Only j has order info - it comes first
+		if hasJ {
+			return false
+		}
+		// Neither has order info - sort alphabetically
+		return teams[i] < teams[j]
+	})
 
 	now := time.Now().UTC()
 
