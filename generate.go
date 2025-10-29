@@ -18,6 +18,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// Constants
+const domain = "schedule.omahalightningbasketball.com"
+const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
+const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
+const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
+const googleSheetLocationsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=1311642203"
+
+// Variables
+//
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
@@ -27,129 +36,7 @@ var stylesCSS string
 //go:embed templates/schedule.js
 var scheduleJS string
 
-const domain = "schedule.omahalightningbasketball.com"
-
-const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
-const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
-const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
-const googleSheetLocationsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=1311642203"
-
-// Location represents a game location
-type Location struct {
-	Abbrev  string
-	Name    string
-	Address string
-}
-
-func fetchLocations() ([]Location, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Get(googleSheetLocationsCSVURL)
-	if err != nil {
-		return nil, fmt.Errorf("error fetching locations sheet: %v", err)
-	}
-	defer resp.Body.Close()
-
-	reader := csv.NewReader(resp.Body)
-	var locations []Location
-
-	// Read header row
-	_, err = reader.Read()
-	if err != nil {
-		return nil, fmt.Errorf("error reading CSV header: %v", err)
-	}
-
-	// Parse data rows
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			continue
-		}
-
-		// Expected columns: Abbreviation, Full Location Name, Address
-		if len(record) < 3 {
-			continue
-		}
-
-		abbreviation := strings.TrimSpace(record[0])
-		fullName := strings.TrimSpace(record[1])
-		address := strings.TrimSpace(record[2])
-
-		// Skip rows with missing data
-		if fullName == "" {
-			continue
-		}
-
-		locations = append(locations, Location{
-			Abbrev:  abbreviation,
-			Name:    fullName,
-			Address: address,
-		})
-	}
-
-	return locations, nil
-}
-
 var locations []Location
-
-// findLocationByName searches for a location by its full name
-// Returns the Location and any court/gym info after the hyphen
-func findLocationByName(name string) (*Location, string) {
-	name = strings.TrimSpace(name)
-	if name == "" || name == "TBD" {
-		return nil, ""
-	}
-
-	// Strip out court/gym info if present (e.g., "Venue Name - Court 1" -> "Venue Name")
-	baseName := name
-	courtGymInfo := ""
-	if idx := strings.Index(name, " - "); idx != -1 {
-		baseName = strings.TrimSpace(name[:idx])
-		courtGymInfo = strings.TrimSpace(name[idx+3:])
-	}
-
-	for i := range locations {
-		if locations[i].Name == baseName {
-			return &locations[i], courtGymInfo
-		}
-	}
-	return nil, courtGymInfo
-}
-
-// findLocationByAbbrev searches for a location by its abbreviation
-// Returns the Location and any court/gym info after the hyphen
-func findLocationByAbbrev(abbrev string) (*Location, string) {
-	abbrev = strings.TrimSpace(abbrev)
-	if abbrev == "" || abbrev == "TBD" {
-		return nil, ""
-	}
-
-	// Strip out court/gym info if present
-	baseAbbrev := abbrev
-	courtGymInfo := ""
-	if idx := strings.Index(abbrev, " - "); idx != -1 {
-		baseAbbrev = strings.TrimSpace(abbrev[:idx])
-		courtGymInfo = strings.TrimSpace(abbrev[idx+3:])
-	}
-
-	for i := range locations {
-		if locations[i].Abbrev == baseAbbrev {
-			return &locations[i], courtGymInfo
-		}
-	}
-	return nil, courtGymInfo
-}
-
-type Team struct {
-	Name     string
-	URL      string
-	HTMLName string
-	Slug     string
-	CssClass string
-	Order    int
-}
 
 var AllTeams = []Team{
 	{
@@ -210,6 +97,24 @@ var AllTeams = []Team{
 	},
 }
 
+// Types
+
+// Location represents a game location
+type Location struct {
+	Abbrev  string
+	Name    string
+	Address string
+}
+
+type Team struct {
+	Name     string
+	URL      string
+	HTMLName string
+	Slug     string
+	CssClass string
+	Order    int
+}
+
 // Game represents a single game
 type Game struct {
 	Team         *Team
@@ -236,6 +141,141 @@ type ScheduleItem struct {
 	IsNote bool
 	Game   *Game
 	Note   *Note
+}
+
+// Template data structures
+type TeamButton struct {
+	Team     *Team
+	IsActive bool
+}
+
+type TemplateScheduleItem struct {
+	IsNote          bool
+	IsWeekStart     bool
+	IsPastGame      bool
+	Game            *Game
+	Note            *Note
+	DisplayDateTime string
+	LocationHTML    template.HTML
+	JerseyText      string
+	OpponentDisplay string
+	ScoreDisplay    string
+}
+
+type TemplateData struct {
+	ProdDomain     string
+	PageTitle      string
+	PagePath       string
+	UpdatedUTC     string
+	UpdatedDisplay string
+	AllTeamsLink   string
+	IsAllTeams     bool
+	TeamRecord     string
+	Teams          []TeamButton
+	ScheduleItems  []TemplateScheduleItem
+	StylesCSS      template.CSS
+	ScheduleJS     template.JS
+}
+
+// Functions
+
+func fetchLocations() ([]Location, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(googleSheetLocationsCSVURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching locations sheet: %v", err)
+	}
+	defer resp.Body.Close()
+
+	reader := csv.NewReader(resp.Body)
+	var locations []Location
+
+	// Read header row
+	_, err = reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV header: %v", err)
+	}
+
+	// Parse data rows
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		// Expected columns: Abbreviation, Full Location Name, Address
+		if len(record) < 3 {
+			continue
+		}
+
+		abbreviation := strings.TrimSpace(record[0])
+		fullName := strings.TrimSpace(record[1])
+		address := strings.TrimSpace(record[2])
+
+		// Skip rows with missing data
+		if fullName == "" {
+			continue
+		}
+
+		locations = append(locations, Location{
+			Abbrev:  abbreviation,
+			Name:    fullName,
+			Address: address,
+		})
+	}
+
+	return locations, nil
+}
+
+// findLocationByName searches for a location by its full name
+// Returns the Location and any court/gym info after the hyphen
+func findLocationByName(name string) (*Location, string) {
+	name = strings.TrimSpace(name)
+	if name == "" || name == "TBD" {
+		return nil, ""
+	}
+
+	// Strip out court/gym info if present (e.g., "Venue Name - Court 1" -> "Venue Name")
+	baseName := name
+	courtGymInfo := ""
+	if idx := strings.Index(name, " - "); idx != -1 {
+		baseName = strings.TrimSpace(name[:idx])
+		courtGymInfo = strings.TrimSpace(name[idx+3:])
+	}
+
+	for i := range locations {
+		if locations[i].Name == baseName {
+			return &locations[i], courtGymInfo
+		}
+	}
+	return nil, courtGymInfo
+}
+
+// findLocationByAbbrev searches for a location by its abbreviation
+// Returns the Location and any court/gym info after the hyphen
+func findLocationByAbbrev(abbrev string) (*Location, string) {
+	abbrev = strings.TrimSpace(abbrev)
+	if abbrev == "" || abbrev == "TBD" {
+		return nil, ""
+	}
+
+	// Strip out court/gym info if present
+	baseAbbrev := abbrev
+	courtGymInfo := ""
+	if idx := strings.Index(abbrev, " - "); idx != -1 {
+		baseAbbrev = strings.TrimSpace(abbrev[:idx])
+		courtGymInfo = strings.TrimSpace(abbrev[idx+3:])
+	}
+
+	for i := range locations {
+		if locations[i].Abbrev == baseAbbrev {
+			return &locations[i], courtGymInfo
+		}
+	}
+	return nil, courtGymInfo
 }
 
 func findTeamByName(teamName string) *Team {
@@ -663,40 +703,6 @@ func convertLinksToHTML(text string) string {
 	return urlRegex.ReplaceAllStringFunc(text, func(url string) string {
 		return fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, url, url)
 	})
-}
-
-// Template data structures
-type TeamButton struct {
-	Team     *Team
-	IsActive bool
-}
-
-type TemplateScheduleItem struct {
-	IsNote          bool
-	IsWeekStart     bool
-	IsPastGame      bool
-	Game            *Game
-	Note            *Note
-	DisplayDateTime string
-	LocationHTML    template.HTML
-	JerseyText      string
-	OpponentDisplay string
-	ScoreDisplay    string
-}
-
-type TemplateData struct {
-	ProdDomain     string
-	PageTitle      string
-	PagePath       string
-	UpdatedUTC     string
-	UpdatedDisplay string
-	AllTeamsLink   string
-	IsAllTeams     bool
-	TeamRecord     string
-	Teams          []TeamButton
-	ScheduleItems  []TemplateScheduleItem
-	StylesCSS      template.CSS
-	ScheduleJS     template.JS
 }
 
 // generateHTML generates HTML schedule page using templates
