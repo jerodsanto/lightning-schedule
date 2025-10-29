@@ -46,6 +46,7 @@ h1 {
 }
 .schedule-body {
   overflow-x: auto;
+  -webkit-overflow-scrolling: none;
 }
 
 table {
