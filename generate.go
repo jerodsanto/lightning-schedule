@@ -18,8 +18,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// Embed the template file into the binary
-//
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
@@ -144,16 +142,14 @@ func findLocationByAbbrev(abbrev string) (*Location, string) {
 	return nil, courtGymInfo
 }
 
-// TeamInfo holds team configuration
-type TeamInfo struct {
+type Team struct {
 	URL      string
 	HTMLName string
 	CssClass string
 	Order    int
 }
 
-// Team URLs - Add more teams here
-var teamURLs = map[string]TeamInfo{
+var AllTeams = map[string]Team{
 	"Varsity": {
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
@@ -232,8 +228,8 @@ func getTeamSlug(teamName string) string {
 }
 
 func getTeamCssClass(teamName string) string {
-	if teamInfo, exists := teamURLs[teamName]; exists {
-		return teamInfo.CssClass
+	if Team, exists := AllTeams[teamName]; exists {
+		return Team.CssClass
 	} else {
 		return "unknown"
 	}
@@ -805,8 +801,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 				return timeMinA < timeMinB
 			}
 			// Same time - sort by team order
-			orderA := teamURLs[gameA.Team].Order
-			orderB := teamURLs[gameB.Team].Order
+			orderA := AllTeams[gameA.Team].Order
+			orderB := AllTeams[gameB.Team].Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
@@ -815,8 +811,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 
 		if isTBDA && isTBDB {
 			// Both are TBD - group by team
-			orderA := teamURLs[gameA.Team].Order
-			orderB := teamURLs[gameB.Team].Order
+			orderA := AllTeams[gameA.Team].Order
+			orderB := AllTeams[gameB.Team].Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
@@ -827,7 +823,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		return !isTBDA
 	})
 
-	// Get unique teams and sort by their Order field in teamURLs
+	// Get unique teams and sort by their Order field in AllTeams
 	teamSet := make(map[string]bool)
 	for _, game := range allGames {
 		teamSet[game.Team] = true
@@ -838,10 +834,10 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		teams = append(teams, team)
 	}
 
-	// Sort teams by their Order field, with teams not in teamURLs map at the end
+	// Sort teams by their Order field, with teams not in AllTeams map at the end
 	sort.Slice(teams, func(i, j int) bool {
-		infoI, hasI := teamURLs[teams[i]]
-		infoJ, hasJ := teamURLs[teams[j]]
+		infoI, hasI := AllTeams[teams[i]]
+		infoJ, hasJ := AllTeams[teams[j]]
 
 		// Both have order info - sort by order
 		if hasI && hasJ {
@@ -1272,9 +1268,9 @@ func main() {
 	}
 
 	// Fetch games from team URLs (skip teams without URLs)
-	for displayName, teamInfo := range teamURLs {
-		if teamInfo.URL != "" {
-			games, err := scrapeTeamSchedule(displayName, teamInfo.URL, teamInfo.HTMLName, teamInfo.CssClass)
+	for displayName, Team := range AllTeams {
+		if Team.URL != "" {
+			games, err := scrapeTeamSchedule(displayName, Team.URL, Team.HTMLName, Team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue
