@@ -143,52 +143,68 @@ func findLocationByAbbrev(abbrev string) (*Location, string) {
 }
 
 type Team struct {
+	Name     string
 	URL      string
 	HTMLName string
+	Slug     string
 	CssClass string
 	Order    int
 }
 
-var AllTeams = map[string]Team{
-	"Varsity": {
+var AllTeams = []Team{
+	{
+		Name:     "Varsity",
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
+		Slug:     "varsity",
 		CssClass: "varsity",
 		Order:    1,
 	},
-	"JV": {
+	{
+		Name:     "JV",
 		URL:      "", // No URL - only from Google Sheet
 		HTMLName: "",
+		Slug:     "jv",
 		CssClass: "jv",
 		Order:    2,
 	},
-	"14U Gold": {
+	{
+		Name:     "14U Gold",
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
 		HTMLName: "Omaha Lightning Gold 8th",
+		Slug:     "14ugold",
 		CssClass: "gold",
 		Order:    3,
 	},
-	"14U White": {
+	{
+		Name:     "14U White",
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h20250803221620558cb62c45d697d46",
 		HTMLName: "Omaha Lightning White 8th",
+		Slug:     "14uwhite",
 		CssClass: "white",
 		Order:    4,
 	},
-	"12U Blue": {
+	{
+		Name:     "12U Blue",
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263029c941335204c&IDTeam=h20250803221620486ddba884e17c748",
 		HTMLName: "Omaha Lightning Blue 6th",
+		Slug:     "12ublue",
 		CssClass: "blue",
 		Order:    5,
 	},
-	"10U Red": {
+	{
+		Name:     "10U Red",
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263e6b6d69f385c49&IDTeam=h202508032216206132b484a6720f345",
 		HTMLName: "Omaha Lightning Red 4th",
+		Slug:     "10ured",
 		CssClass: "red",
 		Order:    6,
 	},
-	"10U Black": {
+	{
+		Name:     "10U Black",
 		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263934d14719c5d45&IDTeam=h202508032216205157e930ef2d5314d",
 		HTMLName: "Omaha Lightning Black 3rd",
+		Slug:     "10ublack",
 		CssClass: "black",
 		Order:    7,
 	},
@@ -196,7 +212,7 @@ var AllTeams = map[string]Team{
 
 // Game represents a single game
 type Game struct {
-	Team         string
+	Team         *Team
 	Date         string
 	Time         string
 	Location     *Location
@@ -205,7 +221,6 @@ type Game struct {
 	HomeAway     string
 	Score        string
 	Result       string // "W", "L", or "" for unplayed games
-	CssClass     string
 }
 
 // Note represents a note to display on a specific date
@@ -223,16 +238,13 @@ type ScheduleItem struct {
 	Note   *Note
 }
 
-func getTeamSlug(teamName string) string {
-	return strings.ToLower(strings.ReplaceAll(teamName, " ", ""))
-}
-
-func getTeamCssClass(teamName string) string {
-	if Team, exists := AllTeams[teamName]; exists {
-		return Team.CssClass
-	} else {
-		return "unknown"
+func findTeamByName(teamName string) *Team {
+	for i := range AllTeams {
+		if AllTeams[i].Name == teamName {
+			return &AllTeams[i]
+		}
 	}
+	return nil
 }
 
 func fetchGoogleSheetGames() ([]Game, error) {
@@ -267,19 +279,20 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			continue
 		}
 
-		team := strings.TrimSpace(record[0])
+		team := findTeamByName(strings.TrimSpace(record[0]))
 		date := strings.TrimSpace(record[1])
 		timeStr := strings.TrimSpace(record[2])
 		location := strings.TrimSpace(record[3])
 		jersey := strings.TrimSpace(record[4])
 		opponent := strings.TrimSpace(record[5])
 		score := ""
+
 		if len(record) >= 7 {
 			score = strings.TrimSpace(record[6])
 		}
 
 		// Skip rows with missing critical data
-		if team == "" || date == "" || opponent == "" {
+		if team == nil || date == "" || opponent == "" {
 			continue
 		}
 
@@ -339,7 +352,6 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			HomeAway:     homeAway,
 			Score:        score,
 			Result:       result,
-			CssClass:     getTeamCssClass(team),
 		})
 	}
 
@@ -560,7 +572,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 				loc, courtGymInfo := findLocationByName(location)
 
 				games = append(games, Game{
-					Team:         displayName,
+					Team:         findTeamByName(displayName),
 					Date:         currentDate,
 					Time:         timeStr,
 					Location:     loc,
@@ -569,7 +581,6 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 					HomeAway:     homeAway,
 					Score:        score,
 					Result:       result,
-					CssClass:     CssClass,
 				})
 			}
 		})
@@ -656,9 +667,7 @@ func convertLinksToHTML(text string) string {
 
 // Template data structures
 type TeamButton struct {
-	Name     string
-	Link     string
-	CssClass string
+	Team     *Team
 	IsActive bool
 }
 
@@ -691,7 +700,7 @@ type TemplateData struct {
 }
 
 // generateHTML generates HTML schedule page using templates
-func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
+func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
 	// Parse the embedded template
 	tmpl, err := template.New("schedule").Parse(scheduleTemplate)
 	if err != nil {
@@ -700,9 +709,9 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 
 	// Filter games if a specific team is requested
 	var gamesToDisplay []Game
-	if filterTeam != "" {
+	if filterTeam != nil {
 		for _, game := range allGames {
-			if game.Team == filterTeam {
+			if game.Team.Name == filterTeam.Name {
 				gamesToDisplay = append(gamesToDisplay, game)
 			}
 		}
@@ -714,14 +723,14 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	var notesToDisplay []Note
 	for _, note := range allNotes {
 		// For combined schedule (no filter), show all notes
-		if filterTeam == "" {
+		if filterTeam == nil {
 			notesToDisplay = append(notesToDisplay, note)
 		} else {
 			// For team pages, only show notes that:
 			// 1. Have "All Teams" in the Teams column (case-insensitive), OR
 			// 2. Have the team name in the Teams column
 			teamsLower := strings.ToLower(note.Teams)
-			filterTeamLower := strings.ToLower(filterTeam)
+			filterTeamLower := strings.ToLower(filterTeam.Name)
 
 			if teamsLower == "all teams" || strings.Contains(teamsLower, filterTeamLower) {
 				notesToDisplay = append(notesToDisplay, note)
@@ -801,58 +810,42 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 				return timeMinA < timeMinB
 			}
 			// Same time - sort by team order
-			orderA := AllTeams[gameA.Team].Order
-			orderB := AllTeams[gameB.Team].Order
+			orderA := gameA.Team.Order
+			orderB := gameB.Team.Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
-			return gameA.Team < gameB.Team
+			return gameA.Team.Name < gameB.Team.Name
 		}
 
 		if isTBDA && isTBDB {
 			// Both are TBD - group by team
-			orderA := AllTeams[gameA.Team].Order
-			orderB := AllTeams[gameB.Team].Order
+			orderA := gameA.Team.Order
+			orderB := gameB.Team.Order
 			if orderA != orderB {
 				return orderA < orderB
 			}
-			return gameA.Team < gameB.Team
+			return gameA.Team.Name < gameB.Team.Name
 		}
 
 		// One has time, one is TBD - games with times come first
 		return !isTBDA
 	})
 
-	// Get unique teams and sort by their Order field in AllTeams
-	teamSet := make(map[string]bool)
+	// Get unique teams and sort by their Order field
+	teamSet := make(map[*Team]bool)
 	for _, game := range allGames {
 		teamSet[game.Team] = true
 	}
 
-	var teams []string
+	var teams []*Team
 	for team := range teamSet {
 		teams = append(teams, team)
 	}
 
-	// Sort teams by their Order field, with teams not in AllTeams map at the end
+	// Sort teams by their Order field
 	sort.Slice(teams, func(i, j int) bool {
-		infoI, hasI := AllTeams[teams[i]]
-		infoJ, hasJ := AllTeams[teams[j]]
-
-		// Both have order info - sort by order
-		if hasI && hasJ {
-			return infoI.Order < infoJ.Order
-		}
-		// Only i has order info - it comes first
-		if hasI {
-			return true
-		}
-		// Only j has order info - it comes first
-		if hasJ {
-			return false
-		}
-		// Neither has order info - sort alphabetically
-		return teams[i] < teams[j]
+		return teams[i].Order < teams[j].Order
 	})
 
 	now := time.Now().UTC()
@@ -862,9 +855,9 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	pagePath := "/"
 	teamRecord := ""
 
-	if filterTeam != "" {
-		pageTitle = filterTeam
-		pagePath = "/" + getTeamSlug(filterTeam) + "/"
+	if filterTeam != nil {
+		pageTitle = filterTeam.Name
+		pagePath = "/" + filterTeam.Slug + "/"
 
 		// Calculate W-L record for team pages
 		wins := 0
@@ -885,14 +878,9 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	var teamButtons []TeamButton
 
 	for _, team := range teams {
-		teamSlug := getTeamSlug(team)
-		teamLink := "/" + teamSlug + "/"
-
 		teamButtons = append(teamButtons, TeamButton{
-			Name:     team,
-			Link:     teamLink,
-			CssClass: getTeamCssClass(team),
-			IsActive: filterTeam == team,
+			Team:     team,
+			IsActive: (filterTeam != nil && (filterTeam.Name == team.Name)),
 		})
 	}
 
@@ -1011,7 +999,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		ProdDomain:     domain,
 		UpdatedUTC:     now.Format(time.RFC3339),
 		UpdatedDisplay: now.Format("1/2/06") + " at " + now.Format("3:04PM") + " UTC",
-		IsAllTeams:     filterTeam == "",
+		IsAllTeams:     filterTeam == nil,
 		TeamRecord:     teamRecord,
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
@@ -1036,10 +1024,10 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 }
 
 // generateICalendar generates an iCal file for games and notes
-func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filterTeam string) error {
+func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
 	// Filter games if a specific team is requested
 	var gamesToExport []Game
-	if filterTeam != "" {
+	if filterTeam != nil {
 		for _, game := range allGames {
 			if game.Team == filterTeam {
 				gamesToExport = append(gamesToExport, game)
@@ -1053,14 +1041,14 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 	var notesToExport []Note
 	for _, note := range allNotes {
 		// For combined schedule (no filter), show all notes
-		if filterTeam == "" {
+		if filterTeam == nil {
 			notesToExport = append(notesToExport, note)
 		} else {
 			// For team calendars, only show notes that:
 			// 1. Have "All Teams" in the Teams column (case-insensitive), OR
 			// 2. Have the team name in the Teams column
 			teamsLower := strings.ToLower(note.Teams)
-			filterTeamLower := strings.ToLower(filterTeam)
+			filterTeamLower := strings.ToLower(filterTeam.Name)
 
 			if teamsLower == "all teams" || strings.Contains(teamsLower, filterTeamLower) {
 				notesToExport = append(notesToExport, note)
@@ -1077,8 +1065,8 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 	ical.WriteString("CALSCALE:GREGORIAN\r\n")
 	ical.WriteString("METHOD:PUBLISH\r\n")
 	ical.WriteString("X-WR-CALNAME:Lightning Schedule")
-	if filterTeam != "" {
-		ical.WriteString(" - " + filterTeam)
+	if filterTeam != nil {
+		ical.WriteString(" - " + filterTeam.Name)
 	}
 	ical.WriteString("\r\n")
 	ical.WriteString("X-WR-TIMEZONE:America/Chicago\r\n")
@@ -1149,7 +1137,7 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 
 		// Create event UID
 		uid := fmt.Sprintf("game-%s-%s-%s@lightningschedule.local",
-			strings.ReplaceAll(game.Team, " ", ""),
+			strings.ReplaceAll(game.Team.Name, " ", ""),
 			dateObj.Format("20060102"),
 			strings.ReplaceAll(game.Time, " ", ""))
 
@@ -1168,15 +1156,15 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		}
 
 		// Event title
-		summary := game.Team + " vs " + game.Opponent
+		summary := game.Team.Name + " vs " + game.Opponent
 		if game.HomeAway == "Away" {
-			summary = game.Team + " @ " + game.Opponent
+			summary = game.Team.Name + " @ " + game.Opponent
 		}
 		ical.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
 
 		// Description with game details
 		description := fmt.Sprintf("Team: %s\\nOpponent: %s\\nJersey: %s",
-			game.Team, game.Opponent, game.HomeAway)
+			game.Team.Name, game.Opponent, game.HomeAway)
 		if game.Score != "" && game.Score != "-" {
 			description += "\\nScore: " + game.Score
 		}
@@ -1268,9 +1256,9 @@ func main() {
 	}
 
 	// Fetch games from team URLs (skip teams without URLs)
-	for displayName, Team := range AllTeams {
-		if Team.URL != "" {
-			games, err := scrapeTeamSchedule(displayName, Team.URL, Team.HTMLName, Team.CssClass)
+	for _, team := range AllTeams {
+		if team.URL != "" {
+			games, err := scrapeTeamSchedule(team.Name, team.URL, team.HTMLName, team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue
@@ -1328,27 +1316,21 @@ func main() {
 	}
 
 	// Generate combined schedule as index.html in output directory
-	err = generateHTML(allGames, allNotes, filepath.Join(distDir, "index.html"), "")
+	err = generateHTML(allGames, allNotes, filepath.Join(distDir, "index.html"), nil)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 
 	// Generate combined iCal file
-	err = generateICalendar(allGames, allNotes, filepath.Join(distDir, "schedule.ics"), "")
+	err = generateICalendar(allGames, allNotes, filepath.Join(distDir, "schedule.ics"), nil)
 	if err != nil {
 		fmt.Printf("Error generating combined iCal: %v\n", err)
 	}
 
 	// Generate individual team schedules in subfolders
-	teamSet := make(map[string]bool)
-	for _, game := range allGames {
-		teamSet[game.Team] = true
-	}
-
-	for team := range teamSet {
-		teamSlug := strings.ToLower(strings.ReplaceAll(team, " ", ""))
-		teamDir := filepath.Join(distDir, teamSlug)
+	for _, team := range AllTeams {
+		teamDir := filepath.Join(distDir, team.Slug)
 		err = os.MkdirAll(teamDir, 0755)
 		if err != nil {
 			fmt.Printf("Error creating team directory: %v\n", err)
@@ -1356,15 +1338,15 @@ func main() {
 		}
 
 		// Generate HTML for team
-		err = generateHTML(allGames, allNotes, filepath.Join(teamDir, "index.html"), team)
+		err = generateHTML(allGames, allNotes, filepath.Join(teamDir, "index.html"), &team)
 		if err != nil {
-			fmt.Printf("Error generating HTML for %s: %v\n", team, err)
+			fmt.Printf("Error generating HTML for %s: %v\n", team.Name, err)
 		}
 
 		// Generate iCal for team
-		err = generateICalendar(allGames, allNotes, filepath.Join(teamDir, "schedule.ics"), team)
+		err = generateICalendar(allGames, allNotes, filepath.Join(teamDir, "schedule.ics"), &team)
 		if err != nil {
-			fmt.Printf("Error generating iCal for %s: %v\n", team, err)
+			fmt.Printf("Error generating iCal for %s: %v\n", team.Name, err)
 		}
 	}
 

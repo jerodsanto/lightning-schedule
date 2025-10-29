@@ -60,9 +60,9 @@
       >
       {{range .Teams}}
       <a
-        href="{{.Link}}"
-        class="filter-btn {{.CssClass}}{{if .IsActive}} active{{end}}"
-        >{{.Name}}</a
+        href="/{{.Team.Slug}}"
+        class="filter-btn {{.Team.CssClass}}{{if .IsActive}} active{{end}}"
+        >{{.Team.Name}}</a
       >
       {{end}}
       <button id="onlyUpcoming" class="filter-btn">Only Upcoming</button>
@@ -106,7 +106,9 @@
             data-team="{{.Game.Team}}"
           >
             <td>
-              <span class="team-badge {{.Game.CssClass}}">{{.Game.Team}}</span>
+              <a href="" class="team-badge {{.Game.Team.CssClass}}"
+                >{{.Game.Team.Name}}</a
+              >
             </td>
             <td>{{.DisplayDateTime}}</td>
             <td>{{.LocationHTML}}</td>
