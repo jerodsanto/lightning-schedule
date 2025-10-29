@@ -46,7 +46,6 @@ h1 {
 }
 .schedule-body {
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 
 table {
@@ -120,6 +119,7 @@ tr.note-row td {
   border-bottom: 2px solid #ddd;
 }
 .team-badge {
+  text-decoration: none;
   display: inline-block;
   padding: 4px 6px;
   background-color: #2196f3;

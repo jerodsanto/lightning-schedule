@@ -106,7 +106,9 @@
             data-team="{{.Game.Team}}"
           >
             <td>
-              <a href="" class="team-badge {{.Game.Team.CssClass}}"
+              <a
+                href="/{{.Game.Team.Slug}}"
+                class="team-badge {{.Game.Team.CssClass}}"
                 >{{.Game.Team.Name}}</a
               >
             </td>
