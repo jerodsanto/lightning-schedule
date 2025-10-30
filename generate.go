@@ -24,6 +24,7 @@ const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
 const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
 const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
 const googleSheetLocationsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=1311642203"
+const googleSheetTeamsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=440511811"
 
 // Variables
 //
@@ -36,66 +37,8 @@ var stylesCSS string
 //go:embed templates/schedule.js
 var scheduleJS string
 
-var locations []Location
-
-var AllTeams = []Team{
-	{
-		Name:     "Varsity",
-		URL:      "", // No URL - only from Google Sheet
-		HTMLName: "",
-		Slug:     "varsity",
-		CssClass: "varsity",
-		Order:    1,
-	},
-	{
-		Name:     "JV",
-		URL:      "", // No URL - only from Google Sheet
-		HTMLName: "",
-		Slug:     "jv",
-		CssClass: "jv",
-		Order:    2,
-	},
-	{
-		Name:     "14U Gold",
-		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h2025080322162058474d91e7d042e47",
-		HTMLName: "Omaha Lightning Gold 8th",
-		Slug:     "14ugold",
-		CssClass: "gold",
-		Order:    3,
-	},
-	{
-		Name:     "14U White",
-		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263785b6ed3896640&IDTeam=h20250803221620558cb62c45d697d46",
-		HTMLName: "Omaha Lightning White 8th",
-		Slug:     "14uwhite",
-		CssClass: "white",
-		Order:    4,
-	},
-	{
-		Name:     "12U Blue",
-		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263029c941335204c&IDTeam=h20250803221620486ddba884e17c748",
-		HTMLName: "Omaha Lightning Blue 6th",
-		Slug:     "12ublue",
-		CssClass: "blue",
-		Order:    5,
-	},
-	{
-		Name:     "10U Red",
-		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263e6b6d69f385c49&IDTeam=h202508032216206132b484a6720f345",
-		HTMLName: "Omaha Lightning Red 4th",
-		Slug:     "10ured",
-		CssClass: "red",
-		Order:    6,
-	},
-	{
-		Name:     "10U Black",
-		URL:      "https://tourneymachine.com/Public/Results/Team.aspx?IDTournament=h2025031418210726136d760ccca8e44&IDDivision=h20250314182107263934d14719c5d45&IDTeam=h202508032216205157e930ef2d5314d",
-		HTMLName: "Omaha Lightning Black 3rd",
-		Slug:     "10ublack",
-		CssClass: "black",
-		Order:    7,
-	},
-}
+var AllLocations []Location
+var AllTeams []Team
 
 // Types
 
@@ -108,11 +51,12 @@ type Location struct {
 
 type Team struct {
 	Name     string
-	URL      string
-	HTMLName string
 	Slug     string
 	CssClass string
 	Order    int
+	CBLLink1 string
+	CBLLink2 string
+	CBLName  string
 }
 
 // Game represents a single game
@@ -187,7 +131,7 @@ func fetchLocations() ([]Location, error) {
 	defer resp.Body.Close()
 
 	reader := csv.NewReader(resp.Body)
-	var locations []Location
+	var AllLocations []Location
 
 	// Read header row
 	headers, err := reader.Read()
@@ -214,14 +158,69 @@ func fetchLocations() ([]Location, error) {
 			continue
 		}
 
-		locations = append(locations, Location{
+		AllLocations = append(AllLocations, Location{
 			Abbrev:  abbreviation,
 			Name:    name,
 			Address: address,
 		})
 	}
 
-	return locations, nil
+	return AllLocations, nil
+}
+
+func fetchTeams() ([]Team, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(googleSheetTeamsCSVURL)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching teams sheet: %v", err)
+	}
+	defer resp.Body.Close()
+
+	reader := csv.NewReader(resp.Body)
+	var teams []Team
+
+	// Read header row
+	headers, err := reader.Read()
+	if err != nil {
+		return nil, fmt.Errorf("error reading CSV header: %v", err)
+	}
+
+	// Parse data rows
+	order := 1
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			continue
+		}
+
+		name := getCellValue(headers, record, "Name")
+		cblLink1 := getCellValue(headers, record, "CBLLink1")
+		cblLink2 := getCellValue(headers, record, "CBLLink2")
+		cblName := getCellValue(headers, record, "CBLName")
+		slug := getCellValue(headers, record, "Slug")
+		css := getCellValue(headers, record, "CSS")
+
+		// Skip rows with missing name
+		if name == "" {
+			continue
+		}
+
+		teams = append(teams, Team{
+			Name:     name,
+			Slug:     slug,
+			CssClass: css,
+			Order:    order,
+			CBLLink1: cblLink1,
+			CBLLink2: cblLink2,
+			CBLName:  cblName,
+		})
+		order++
+	}
+
+	return teams, nil
 }
 
 func findLocationByName(name string) (*Location, string) {
@@ -238,9 +237,9 @@ func findLocationByName(name string) (*Location, string) {
 		courtGymInfo = strings.TrimSpace(name[idx+3:])
 	}
 
-	for i := range locations {
-		if locations[i].Name == baseName {
-			return &locations[i], courtGymInfo
+	for i := range AllLocations {
+		if AllLocations[i].Name == baseName {
+			return &AllLocations[i], courtGymInfo
 		}
 	}
 	return nil, courtGymInfo
@@ -260,9 +259,9 @@ func findLocationByAbbrev(abbrev string) (*Location, string) {
 		courtGymInfo = strings.TrimSpace(abbrev[idx+3:])
 	}
 
-	for i := range locations {
-		if locations[i].Abbrev == baseAbbrev {
-			return &locations[i], courtGymInfo
+	for i := range AllLocations {
+		if AllLocations[i].Abbrev == baseAbbrev {
+			return &AllLocations[i], courtGymInfo
 		}
 	}
 	return nil, courtGymInfo
@@ -1222,18 +1221,25 @@ func stripHTMLTags(html string) string {
 func main() {
 	var allGames []Game
 
-	// Fetch locations from Google Sheet
+	// Fetch teams from Google Sheet
 	var err error
-	locations, err = fetchLocations()
+	AllTeams, err = fetchTeams()
+	if err != nil {
+		fmt.Printf("Error fetching teams: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Fetch locations from Google Sheet
+	AllLocations, err = fetchLocations()
 	if err != nil {
 		fmt.Printf("Error fetching locations: %v\n", err)
-		locations = []Location{} // Use empty slice if fetch fails
+		AllLocations = []Location{} // Use empty slice if fetch fails
 	}
 
 	// Fetch games from team URLs (skip teams without URLs)
 	for _, team := range AllTeams {
-		if team.URL != "" {
-			games, err := scrapeTeamSchedule(team.Name, team.URL, team.HTMLName, team.CssClass)
+		if team.CBLLink1 != "" {
+			games, err := scrapeTeamSchedule(team.Name, team.CBLLink1, team.CBLName, team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 				continue
