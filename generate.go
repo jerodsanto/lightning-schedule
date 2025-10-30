@@ -178,7 +178,6 @@ type TemplateData struct {
 }
 
 // Functions
-
 func fetchLocations() ([]Location, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(googleSheetLocationsCSVURL)
@@ -191,7 +190,7 @@ func fetchLocations() ([]Location, error) {
 	var locations []Location
 
 	// Read header row
-	_, err = reader.Read()
+	headers, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("error reading CSV header: %v", err)
 	}
@@ -206,23 +205,18 @@ func fetchLocations() ([]Location, error) {
 			continue
 		}
 
-		// Expected columns: Abbreviation, Full Location Name, Address
-		if len(record) < 3 {
-			continue
-		}
-
-		abbreviation := strings.TrimSpace(record[0])
-		fullName := strings.TrimSpace(record[1])
-		address := strings.TrimSpace(record[2])
+		abbreviation := getCellValue(headers, record, "Abbrev")
+		name := getCellValue(headers, record, "Name")
+		address := getCellValue(headers, record, "Address")
 
 		// Skip rows with missing data
-		if fullName == "" {
+		if name == "" {
 			continue
 		}
 
 		locations = append(locations, Location{
 			Abbrev:  abbreviation,
-			Name:    fullName,
+			Name:    name,
 			Address: address,
 		})
 	}
@@ -230,8 +224,6 @@ func fetchLocations() ([]Location, error) {
 	return locations, nil
 }
 
-// findLocationByName searches for a location by its full name
-// Returns the Location and any court/gym info after the hyphen
 func findLocationByName(name string) (*Location, string) {
 	name = strings.TrimSpace(name)
 	if name == "" || name == "TBD" {
@@ -254,8 +246,6 @@ func findLocationByName(name string) (*Location, string) {
 	return nil, courtGymInfo
 }
 
-// findLocationByAbbrev searches for a location by its abbreviation
-// Returns the Location and any court/gym info after the hyphen
 func findLocationByAbbrev(abbrev string) (*Location, string) {
 	abbrev = strings.TrimSpace(abbrev)
 	if abbrev == "" || abbrev == "TBD" {
@@ -299,7 +289,7 @@ func fetchGoogleSheetGames() ([]Game, error) {
 	var games []Game
 
 	// Read header row
-	_, err = reader.Read()
+	headers, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("error reading CSV header: %v", err)
 	}
@@ -314,22 +304,13 @@ func fetchGoogleSheetGames() ([]Game, error) {
 			continue
 		}
 
-		// Expected columns: Team, Date, Time, Location, Jersey, Opponent, Score
-		if len(record) < 6 {
-			continue
-		}
-
-		team := findTeamByName(strings.TrimSpace(record[0]))
-		date := strings.TrimSpace(record[1])
-		timeStr := strings.TrimSpace(record[2])
-		location := strings.TrimSpace(record[3])
-		jersey := strings.TrimSpace(record[4])
-		opponent := strings.TrimSpace(record[5])
-		score := ""
-
-		if len(record) >= 7 {
-			score = strings.TrimSpace(record[6])
-		}
+		team := findTeamByName(getCellValue(headers, record, "Team"))
+		date := getCellValue(headers, record, "Date")
+		timeStr := getCellValue(headers, record, "Time")
+		location := getCellValue(headers, record, "Location")
+		jersey := getCellValue(headers, record, "Jersey")
+		opponent := getCellValue(headers, record, "Opponent")
+		score := getCellValue(headers, record, "Score")
 
 		// Skip rows with missing critical data
 		if team == nil || date == "" || opponent == "" {
@@ -398,32 +379,37 @@ func fetchGoogleSheetGames() ([]Game, error) {
 	return games, nil
 }
 
-// parseNoteTextWithLinks converts note text to HTML, handling embedded links
-// Supports formats:
-// - Plain URLs: http://example.com -> clickable link
-// - Markdown style: [text](url) -> <a href="url">text</a>
-// - Just pass through any existing HTML from copy-paste
+func isPresent(v any) bool {
+	if v == nil {
+		return false
+	}
+	if s, ok := v.(*string); ok {
+		return s != nil && *s != ""
+	}
+	if s, ok := v.(string); ok {
+		return s != ""
+	}
+	return false
+}
+
+// getCellValue retrieves a cell value from a record by header name
+// Returns empty string if the header name doesn't match any column
+func getCellValue(headers []string, record []string, headerName string) string {
+	for i, header := range headers {
+		if strings.TrimSpace(header) == headerName {
+			if i < len(record) {
+				return strings.TrimSpace(record[i])
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
+// Supports markdown-style links: [text](url) -> <a href="url">text</a>
 func parseNoteTextWithLinks(text string) string {
-	// First, convert markdown-style links [text](url)
 	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\((https?://[^\)]+)\)`)
 	text = markdownLinkRegex.ReplaceAllString(text, `<a href="$2" target="_blank">$1</a>`)
-
-	// Then convert bare URLs that aren't already in anchor tags
-	urlRegex := regexp.MustCompile(`(?:^|[^"'>])(https?://[^\s<]+)`)
-	text = urlRegex.ReplaceAllStringFunc(text, func(match string) string {
-		// Check if this URL is already part of an href attribute
-		if strings.Contains(match, `href="`) {
-			return match
-		}
-		// Extract just the URL part (might have leading space/character)
-		parts := strings.SplitN(match, "http", 2)
-		if len(parts) == 2 {
-			url := "http" + parts[1]
-			return parts[0] + fmt.Sprintf(`<a href="%s" target="_blank">%s</a>`, url, url)
-		}
-		return match
-	})
-
 	return text
 }
 
@@ -439,7 +425,7 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 	var notes []Note
 
 	// Read header row
-	_, err = reader.Read()
+	headers, err := reader.Read()
 	if err != nil {
 		return nil, fmt.Errorf("error reading CSV header: %v", err)
 	}
@@ -454,13 +440,9 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			continue
 		}
 
-		// Expected columns: Date, Text, Link URL (optional), Teams
-		if len(record) < 2 {
-			continue
-		}
-
-		date := strings.TrimSpace(record[0])
-		text := strings.TrimSpace(record[1])
+		date := getCellValue(headers, record, "Date")
+		text := getCellValue(headers, record, "Text")
+		teams := getCellValue(headers, record, "Teams")
 
 		// Skip rows with missing data
 		if date == "" || text == "" {
@@ -469,12 +451,6 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 
 		// Parse the text for embedded links (markdown style or bare URLs)
 		text = parseNoteTextWithLinks(text)
-
-		// Get teams from third column (or default to empty string)
-		teams := ""
-		if len(record) >= 3 {
-			teams = strings.TrimSpace(record[2])
-		}
 
 		// Parse date to standard format
 		formattedDate := date
@@ -629,7 +605,6 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 	return games, nil
 }
 
-// parseDateForSorting parses date string for sorting
 func parseDateForSorting(dateStr string) time.Time {
 	// Handle format like "Saturday, October 18, 2025"
 	layouts := []string{
@@ -650,7 +625,6 @@ func parseDateForSorting(dateStr string) time.Time {
 	return time.Date(2099, 12, 31, 0, 0, 0, 0, time.UTC)
 }
 
-// parseTimeToMinutes parses time string to minutes for sorting
 func parseTimeToMinutes(timeStr string) int {
 	// Parse time like "6:00 PM" or "10:30 AM"
 	re := regexp.MustCompile(`(\d+):(\d+)\s*(AM|PM)`)
@@ -696,7 +670,6 @@ func formatTime(timeStr string) string {
 	return timeStr
 }
 
-// convertLinksToHTML converts URLs in text to HTML anchor tags
 func convertLinksToHTML(text string) string {
 	// Match URLs (http:// or https://)
 	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
@@ -705,7 +678,6 @@ func convertLinksToHTML(text string) string {
 	})
 }
 
-// generateHTML generates HTML schedule page using templates
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
 	// Parse the embedded template
 	tmpl, err := template.New("schedule").Parse(scheduleTemplate)
@@ -953,7 +925,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		var locationHTML template.HTML
 		if game.Location != nil {
 			var locDisplay string
-			if game.Location.Address != "" {
+			if isPresent(game.Location.Address) {
 				// Location has an address - make it a Google Maps link
 				mapsURL := "https://maps.google.com/?q=" +
 					strings.ReplaceAll(game.Location.Address, " ", "+")
@@ -1029,7 +1001,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	return nil
 }
 
-// generateICalendar generates an iCal file for games and notes
 func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
 	// Filter games if a specific team is requested
 	var gamesToExport []Game
@@ -1225,7 +1196,6 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 	return nil
 }
 
-// escapeICalText escapes special characters for iCal text fields
 func escapeICalText(text string) string {
 	text = strings.ReplaceAll(text, "\\", "\\\\")
 	text = strings.ReplaceAll(text, ",", "\\,")
@@ -1235,7 +1205,6 @@ func escapeICalText(text string) string {
 	return text
 }
 
-// stripHTMLTags removes HTML tags from text
 func stripHTMLTags(html string) string {
 	// Remove HTML tags
 	re := regexp.MustCompile(`<[^>]*>`)
