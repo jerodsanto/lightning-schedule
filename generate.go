@@ -677,6 +677,14 @@ func convertLinksToHTML(text string) string {
 	})
 }
 
+func (g Game) IsPastGame(gameDate time.Time, now time.Time) bool {
+	// A game is considered past if:
+	// 1. It has a result (W or L), OR
+	// 2. The game date is valid (not year 2099) AND the date is yesterday or earlier
+	yesterday := now.AddDate(0, 0, -1)
+	return g.Result != "" || (gameDate.Year() != 2099 && gameDate.Before(yesterday))
+}
+
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
 	// Parse the embedded template
 	tmpl, err := template.New("schedule").Parse(scheduleTemplate)
@@ -954,12 +962,10 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			score = ""
 		}
 
-		isPastGame := game.Result == "W" || game.Result == "L" || (dateObj.Year() != 2099 && dateObj.Before(now))
-
 		templateItems = append(templateItems, TemplateScheduleItem{
 			IsNote:          false,
 			IsWeekStart:     isWeekStart,
-			IsPastGame:      isPastGame,
+			IsPastGame:      game.IsPastGame(dateObj, now),
 			Game:            game,
 			DisplayDateTime: displayDateTime,
 			LocationHTML:    locationHTML,
