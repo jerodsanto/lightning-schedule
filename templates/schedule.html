@@ -105,18 +105,18 @@
             class="game-row{{if .IsWeekStart}} week-start{{end}}{{if .IsPastGame}} past-game{{end}}"
             data-team="{{.Game.Team}}"
           >
-            <td>
+            <td class="team">
               <a
                 href="/{{.Game.Team.Slug}}"
                 class="team-badge {{.Game.Team.CssClass}}"
                 >{{.Game.Team.Name}}</a
               >
             </td>
-            <td>{{.DisplayDateTime}}</td>
-            <td>{{.LocationHTML}}</td>
-            <td>{{.JerseyText}}</td>
-            <td>{{.OpponentDisplay}}</td>
-            <td>{{.ScoreDisplay}}</td>
+            <td class="time">{{.DisplayDateTime}}</td>
+            <td class="location">{{.LocationHTML}}</td>
+            <td class="jersey">{{.JerseyText}}</td>
+            <td class="opponent">{{.OpponentDisplay}}</td>
+            <td class="score">{{.ScoreDisplay}}</td>
           </tr>
           {{end}} {{end}}
         </tbody>

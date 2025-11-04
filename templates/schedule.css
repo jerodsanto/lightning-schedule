@@ -75,34 +75,22 @@ td a {
 td a:hover {
   color: #004499;
 }
-/* Team */
-th:nth-child(1),
-td:nth-child(1) {
+td.team {
   min-width: 60px;
 }
-/* Time */
-th:nth-child(2),
-td:nth-child(2) {
-  min-width: 80px;
-}
-/* Location */
-th:nth-child(3),
-td:nth-child(3) {
-  min-width: 120px;
-}
-/* Jersey */
-th:nth-child(4),
-td:nth-child(4) {
-  min-width: 40px;
-}
-/* Opponent */
-th:nth-child(5),
-td:nth-child(5) {
+td.time {
   min-width: 100px;
 }
-/* Score */
-th:nth-child(6),
-td:nth-child(6) {
+td.location {
+  min-width: 120px;
+}
+td.jersey {
+  min-width: 40px;
+}
+td.opponent {
+  min-width: 100px;
+}
+td.score {
   min-width: 45px;
 }
 tr.week-start td {
