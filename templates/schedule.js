@@ -114,6 +114,7 @@ function throttle(fn, context) {
 function syncTableHeaders() {
   const headerTable = document.querySelector(".schedule-header table");
   const bodyContainer = document.querySelector(".schedule-body");
+  const bodyTable = bodyContainer.querySelector("table");
 
   // Throttled sync for horizontal scroll (runs ~60 FPS max)
   const throttledSync = throttle(() => {
@@ -122,14 +123,17 @@ function syncTableHeaders() {
 
   bodyContainer.addEventListener("scroll", throttledSync);
 
-  // Match column widths
+  // Match column widths by reading from first visible row's cells
   const headerThs = headerTable.querySelectorAll("th");
-  const bodyThs = document.querySelectorAll(".body-table th");
-  headerThs.forEach((headerTh, i) => {
-    if (bodyThs[i]) {
-      headerTh.style.width = `${bodyThs[i].offsetWidth}px`;
-    }
-  });
+  const firstRow = bodyTable.querySelector("tbody tr");
+  if (firstRow) {
+    const bodyCells = firstRow.querySelectorAll("td");
+    headerThs.forEach((headerTh, i) => {
+      if (bodyCells[i]) {
+        headerTh.style.width = `${bodyCells[i].offsetWidth}px`;
+      }
+    });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", applyFilters);
