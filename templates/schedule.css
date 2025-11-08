@@ -37,12 +37,14 @@ h1 {
   background-color: #777;
 }
 
-/* table container */
 .schedule-header {
   position: sticky;
   top: 0;
   z-index: 10;
   overflow-x: hidden;
+}
+.schedule-header table {
+  table-layout: fixed;
 }
 .schedule-body {
   overflow-x: auto;

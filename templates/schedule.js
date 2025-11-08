@@ -130,7 +130,17 @@ function syncTableHeaders() {
     const bodyCells = firstRow.querySelectorAll("td");
     headerThs.forEach((headerTh, i) => {
       if (bodyCells[i]) {
-        headerTh.style.width = `${bodyCells[i].offsetWidth}px`;
+        // Get the computed padding from the td
+        const tdStyles = window.getComputedStyle(bodyCells[i]);
+        const tdPaddingLeft = parseFloat(tdStyles.paddingLeft);
+        const tdPaddingRight = parseFloat(tdStyles.paddingRight);
+
+        // Calculate content width (offsetWidth includes padding and border)
+        const contentWidth =
+          bodyCells[i].offsetWidth - tdPaddingLeft - tdPaddingRight;
+
+        // Set the th width to content width (its padding will be added on top)
+        headerTh.style.width = `${contentWidth}px`;
       }
     });
   }
