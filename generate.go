@@ -1156,16 +1156,26 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		}
 		ical.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
 
-		// Description with game details
-		description := fmt.Sprintf("Jersey: %s", formatJersey(&game, "cal"))
+		description := ""
+		if game.CourtGymInfo != "" {
+			description = game.CourtGymInfo + "\n"
+		}
+
+		description += fmt.Sprintf("Jersey: %s", formatJersey(&game, "cal"))
+
 		if game.Score != "" && game.Score != "-" {
 			description += "\nScore: " + game.Score
 		}
 		ical.WriteString("DESCRIPTION:" + escapeICalText(description) + "\r\n")
 
-		// Location
 		if game.Location != nil {
-			ical.WriteString("LOCATION:" + escapeICalText(game.Location.Name) + "\r\n")
+			location := game.Location.Name
+
+			// Add address if present for better calendar app support
+			if game.Location.Address != "" {
+				location += ", " + game.Location.Address
+			}
+			ical.WriteString("LOCATION:" + escapeICalText(location) + "\r\n")
 		}
 
 		ical.WriteString("END:VEVENT\r\n")
