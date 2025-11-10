@@ -696,7 +696,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	var gamesToDisplay []Game
 	if filterTeam != nil {
 		for _, game := range allGames {
-			if game.Team.Name == filterTeam.Name {
+			if game.Team.Slug == filterTeam.Slug {
 				gamesToDisplay = append(gamesToDisplay, game)
 			}
 		}
@@ -1011,7 +1011,7 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 	var gamesToExport []Game
 	if filterTeam != nil {
 		for _, game := range allGames {
-			if game.Team == filterTeam {
+			if game.Team.Slug == filterTeam.Slug {
 				gamesToExport = append(gamesToExport, game)
 			}
 		}
