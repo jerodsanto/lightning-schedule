@@ -669,6 +669,26 @@ func formatTime(timeStr string) string {
 	return timeStr
 }
 
+func formatJersey(game *Game, style string) string {
+	jerseyText := "TBD"
+
+	if style == "html" {
+		if game.HomeAway == "Home" {
+			jerseyText = "⬜️"
+		} else if game.HomeAway == "Away" {
+			jerseyText = "⬛️"
+		}
+	} else if style == "cal" {
+		if game.HomeAway == "Home" {
+			jerseyText = "Home (Light)"
+		} else if game.HomeAway == "Away" {
+			jerseyText = "Away (Dark)"
+		}
+	}
+
+	return jerseyText
+}
+
 func convertLinksToHTML(text string) string {
 	// Match URLs (http:// or https://)
 	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
@@ -920,14 +940,6 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			}
 		}
 
-		// Format jersey text
-		jerseyText := "TBD"
-		if game.HomeAway == "Home" {
-			jerseyText = "⬜️"
-		} else if game.HomeAway == "Away" {
-			jerseyText = "⬛️"
-		}
-
 		// Generate location HTML with Google Maps link if address is available
 		var locationHTML template.HTML
 		if game.Location != nil {
@@ -969,7 +981,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			Game:            game,
 			DisplayDateTime: displayDateTime,
 			LocationHTML:    locationHTML,
-			JerseyText:      jerseyText,
+			JerseyText:      formatJersey(game, "html"),
 			OpponentDisplay: opponent,
 			ScoreDisplay:    score,
 		})
@@ -1145,10 +1157,9 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		ical.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
 
 		// Description with game details
-		description := fmt.Sprintf("Team: %s\\nOpponent: %s\\nJersey: %s",
-			game.Team.Name, game.Opponent, game.HomeAway)
+		description := fmt.Sprintf("Jersey: %s", formatJersey(&game, "cal"))
 		if game.Score != "" && game.Score != "-" {
-			description += "\\nScore: " + game.Score
+			description += "\nScore: " + game.Score
 		}
 		ical.WriteString("DESCRIPTION:" + escapeICalText(description) + "\r\n")
 
