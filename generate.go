@@ -28,6 +28,10 @@ const googleSheetTeamsCSVURL = "https://docs.google.com/spreadsheets/d/" + googl
 
 // Variables
 //
+// Supports markdown-style links: [text](url) -> <a href="url">text</a>
+// Shared regex for matching markdown links [text](url)
+var markdownLinkRegex = regexp.MustCompile(`\[([^\]]+)\]\(([^\)]+)\)`)
+
 //go:embed templates/schedule.html
 var scheduleTemplate string
 
@@ -405,9 +409,8 @@ func getCellValue(headers []string, record []string, headerName string) string {
 	return ""
 }
 
-// Supports markdown-style links: [text](url) -> <a href="url">text</a>
 func parseNoteTextWithLinks(text string) string {
-	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\((https?://[^\)]+)\)`)
+	// Convert markdown links to HTML anchor tags
 	text = markdownLinkRegex.ReplaceAllString(text, `<a href="$2" target="_blank">$1</a>`)
 	return text
 }
@@ -448,9 +451,6 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			continue
 		}
 
-		// Parse the text for embedded links (markdown style or bare URLs)
-		text = parseNoteTextWithLinks(text)
-
 		// Parse date to standard format
 		formattedDate := date
 		if dateObj, err := time.Parse("1/2/2006", date); err == nil {
@@ -461,10 +461,13 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			formattedDate = dateObj.Format("Monday, January 2, 2006")
 		}
 
+		// Parse the text for embedded links (markdown style) for HTML display
+		htmlText := parseNoteTextWithLinks(text)
+
 		notes = append(notes, Note{
 			Date:     formattedDate,
-			Text:     text,
-			HTMLText: template.HTML(text),
+			Text:     text,                    // Store raw text
+			HTMLText: template.HTML(htmlText), // Store HTML version
 			Teams:    teams,
 		})
 	}
@@ -1198,16 +1201,26 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 			dateObj.Format("20060102"),
 			fmt.Sprintf("%x", strings.ReplaceAll(note.Text, " ", "")))
 
-		// Strip HTML tags from note text for plain text summary
-		plainText := stripHTMLTags(note.Text)
+		// Split on | to separate summary from description (note.Text contains raw text)
+		parts := strings.Split(note.Text, "|")
+		summary := strings.TrimSpace(parts[0])
+		description := "" // Default to empty if no description parts
+		if len(parts) > 1 {
+			// Join remaining parts with newlines and parse markdown links
+			descParts := make([]string, len(parts)-1)
+			for i, part := range parts[1:] {
+				descParts[i] = parseMarkdownLinks(strings.TrimSpace(part))
+			}
+			description = strings.Join(descParts, "\n")
+		}
 
 		ical.WriteString("BEGIN:VEVENT\r\n")
 		ical.WriteString("UID:" + uid + "\r\n")
 		ical.WriteString("DTSTAMP:" + time.Now().UTC().Format("20060102T150405Z") + "\r\n")
 		ical.WriteString("DTSTART;VALUE=DATE:" + startTime.Format("20060102") + "\r\n")
 		ical.WriteString("DTEND;VALUE=DATE:" + endTime.Format("20060102") + "\r\n")
-		ical.WriteString("SUMMARY:" + escapeICalText(plainText) + "\r\n")
-		ical.WriteString("DESCRIPTION:" + escapeICalText(plainText) + "\r\n")
+		ical.WriteString("SUMMARY:" + escapeICalText(summary) + "\r\n")
+		ical.WriteString("DESCRIPTION:" + escapeICalText(description) + "\r\n")
 		ical.WriteString("END:VEVENT\r\n")
 	}
 
@@ -1231,18 +1244,10 @@ func escapeICalText(text string) string {
 	return text
 }
 
-func stripHTMLTags(html string) string {
-	// Remove HTML tags
-	re := regexp.MustCompile(`<[^>]*>`)
-	text := re.ReplaceAllString(html, "")
-	// Decode common HTML entities
-	text = strings.ReplaceAll(text, "&nbsp;", " ")
-	text = strings.ReplaceAll(text, "&amp;", "&")
-	text = strings.ReplaceAll(text, "&lt;", "<")
-	text = strings.ReplaceAll(text, "&gt;", ">")
-	text = strings.ReplaceAll(text, "&quot;", "\"")
-	text = strings.ReplaceAll(text, "&#39;", "'")
-	return text
+// parseMarkdownLinks converts markdown links [text](url) to "text: url" format
+func parseMarkdownLinks(text string) string {
+	// Convert markdown links to "Title: url" format for iCal descriptions
+	return markdownLinkRegex.ReplaceAllString(text, "$1: $2")
 }
 
 func main() {
