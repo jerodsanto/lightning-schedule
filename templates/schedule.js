@@ -125,9 +125,9 @@ function syncTableHeaders() {
 
   // Match column widths by reading from first visible row's cells
   const headerThs = headerTable.querySelectorAll("th");
-  const firstRow = bodyTable.querySelector("tbody tr");
-  if (firstRow) {
-    const bodyCells = firstRow.querySelectorAll("td");
+  const firstGameRow = bodyTable.querySelector("tbody tr.game-row");
+  if (firstGameRow) {
+    const bodyCells = firstGameRow.querySelectorAll("td");
     headerThs.forEach((headerTh, i) => {
       if (bodyCells[i]) {
         // Get the computed padding from the td
