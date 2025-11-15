@@ -359,6 +359,8 @@ func fetchGoogleSheetGames() ([]Game, error) {
 					} else {
 						result = "L"
 					}
+					// Format score with W/L prefix to match team schedule format
+					score = fmt.Sprintf("%s %s-%s", result, strings.TrimSpace(scoreParts[0]), strings.TrimSpace(scoreParts[1]))
 				}
 			}
 		}
