@@ -324,9 +324,13 @@ func fetchGoogleSheetGames() ([]Game, error) {
 		// Determine home/away from jersey field
 		homeAway := ""
 		jerseyLower := strings.ToLower(jersey)
-		if strings.Contains(jerseyLower, "home") || strings.Contains(jerseyLower, "light") {
+		switch {
+		case strings.Contains(jerseyLower, "home"),
+			strings.Contains(jerseyLower, "light"):
 			homeAway = "Home"
-		} else if strings.Contains(jerseyLower, "away") || strings.Contains(jerseyLower, "dark") {
+		case strings.Contains(jerseyLower, "away"),
+			strings.Contains(jerseyLower, "visitor"),
+			strings.Contains(jerseyLower, "dark"):
 			homeAway = "Away"
 		}
 
@@ -678,16 +682,19 @@ func formatTime(timeStr string) string {
 func formatJersey(game *Game, style string) string {
 	jerseyText := "TBD"
 
-	if style == "html" {
-		if game.HomeAway == "Home" {
+	switch style {
+	case "html":
+		switch game.HomeAway {
+		case "Home":
 			jerseyText = "⬜️"
-		} else if game.HomeAway == "Away" {
+		case "Away":
 			jerseyText = "⬛️"
 		}
-	} else if style == "cal" {
-		if game.HomeAway == "Home" {
+	case "cal":
+		switch game.HomeAway {
+		case "Home":
 			jerseyText = "Home (Light)"
-		} else if game.HomeAway == "Away" {
+		case "Away":
 			jerseyText = "Away (Dark)"
 		}
 	}
