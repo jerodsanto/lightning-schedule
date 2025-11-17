@@ -133,7 +133,9 @@ function syncTableHeaders() {
 
   // Match column widths by reading from first visible row's cells
   const headerThs = headerTable.querySelectorAll("th");
-  const firstGameRow = bodyTable.querySelector("tbody tr.game-row");
+  const firstGameRow = bodyTable.querySelector(
+    "tbody tr.game-row:not(.past-game)",
+  );
   if (firstGameRow) {
     const bodyCells = firstGameRow.querySelectorAll("td");
     headerThs.forEach((headerTh, i) => {
