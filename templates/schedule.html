@@ -97,7 +97,7 @@
         </thead>
         <tbody>
           {{range .ScheduleItems}} {{if .IsNote}}
-          <tr class="note-row">
+          <tr class="note-row{{if .IsPastNote}} past-note{{end}}">
             <td colspan="6">{{.Note.HTMLText}}</td>
           </tr>
           {{else}}

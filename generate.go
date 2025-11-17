@@ -101,6 +101,7 @@ type TemplateScheduleItem struct {
 	IsNote          bool
 	IsWeekStart     bool
 	IsPastGame      bool
+	IsPastNote      bool
 	Game            *Game
 	Note            *Note
 	DisplayDateTime string
@@ -898,9 +899,19 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	var templateItems []TemplateScheduleItem
 	for i, item := range scheduleItems {
 		if item.IsNote {
+			// Determine if note is past (at least one day before today)
+			noteDate := parseDateForSorting(item.Note.Date)
+			isPastNote := false
+			if noteDate.Year() != 2099 {
+				// A note is past if its date is at least one day earlier than today
+				oneDayAgo := now.AddDate(0, 0, -1)
+				isPastNote = noteDate.Before(oneDayAgo)
+			}
+
 			templateItems = append(templateItems, TemplateScheduleItem{
-				IsNote: true,
-				Note:   item.Note,
+				IsNote:     true,
+				IsPastNote: isPastNote,
+				Note:       item.Note,
 			})
 			continue
 		}

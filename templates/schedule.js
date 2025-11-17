@@ -89,11 +89,19 @@ function applyFilters() {
     pastGames.forEach(function (row) {
       row.style.display = "none";
     });
+    const pastNotes = document.querySelectorAll("tr.past-note");
+    pastNotes.forEach(function (row) {
+      row.style.display = "none";
+    });
   }
 
   function showPastGames() {
     const pastGames = document.querySelectorAll("tr.past-game");
     pastGames.forEach(function (row) {
+      row.style.display = "";
+    });
+    const pastNotes = document.querySelectorAll("tr.past-note");
+    pastNotes.forEach(function (row) {
       row.style.display = "";
     });
   }
