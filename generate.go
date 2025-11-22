@@ -713,9 +713,10 @@ func convertLinksToHTML(text string) string {
 func (g Game) IsPastGame(gameDate time.Time, now time.Time) bool {
 	// A game is considered past if:
 	// 1. It has a result (W or L), OR
-	// 2. The game date is valid (not year 2099) AND the date is yesterday or earlier
-	yesterday := now.AddDate(0, 0, -1)
-	return g.Result != "" || (gameDate.Year() != 2099 && gameDate.Before(yesterday))
+	// 2. The game date is valid (not year 2099) AND the date is before today
+	// Compare at midnight so games show all day on their date
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return g.Result != "" || (gameDate.Year() != 2099 && gameDate.Before(startOfToday))
 }
 
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
@@ -906,13 +907,15 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	var templateItems []TemplateScheduleItem
 	for i, item := range scheduleItems {
 		if item.IsNote {
-			// Determine if note is past (at least one day before today)
+			// Determine if note is past (before start of today)
 			noteDate := parseDateForSorting(item.Note.Date)
 			isPastNote := false
 			if noteDate.Year() != 2099 {
-				// A note is past if its date is at least one day earlier than today
-				oneDayAgo := now.AddDate(0, 0, -1)
-				isPastNote = noteDate.Before(oneDayAgo)
+				// A note is past if its date is before today (comparing at midnight)
+				// This ensures a note dated 11/22 displays all day on 11/22, and
+				// becomes past at 12:00am on 11/23
+				startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+				isPastNote = noteDate.Before(startOfToday)
 			}
 
 			templateItems = append(templateItems, TemplateScheduleItem{
