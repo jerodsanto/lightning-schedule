@@ -1297,9 +1297,17 @@ func main() {
 			games, err := scrapeTeamSchedule(team.Name, team.CBLLink1, team.CBLName, team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
-				continue
+			} else {
+				allGames = append(allGames, games...)
 			}
-			allGames = append(allGames, games...)
+		}
+		if team.CBLLink2 != "" {
+			games, err := scrapeTeamSchedule(team.Name, team.CBLLink2, team.CBLName, team.CssClass)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+			} else {
+				allGames = append(allGames, games...)
+			}
 		}
 	}
 
