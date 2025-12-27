@@ -82,6 +82,7 @@ type Note struct {
 	Text     string
 	HTMLText template.HTML // HTML-safe version of Text for template rendering
 	Teams    string        // Comma-separated team names or "All Teams"
+	EndDate  string        // For multi-day notes, the last date (used for "past" determination)
 }
 
 // ScheduleItem represents either a game or a note in the schedule
@@ -450,6 +451,7 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 		}
 
 		date := getCellValue(headers, record, "Date")
+		endDate := getCellValue(headers, record, "End Date")
 		text := getCellValue(headers, record, "Text")
 		teams := getCellValue(headers, record, "Teams")
 
@@ -468,11 +470,24 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 			formattedDate = dateObj.Format("Monday, January 2, 2006")
 		}
 
+		// Parse end date to standard format (if provided, otherwise use date)
+		formattedEndDate := formattedDate
+		if endDate != "" {
+			if dateObj, err := time.Parse("1/2/2006", endDate); err == nil {
+				formattedEndDate = dateObj.Format("Monday, January 2, 2006")
+			} else if dateObj, err := time.Parse("01/02/2006", endDate); err == nil {
+				formattedEndDate = dateObj.Format("Monday, January 2, 2006")
+			} else if dateObj, err := time.Parse("1/2/06", endDate); err == nil {
+				formattedEndDate = dateObj.Format("Monday, January 2, 2006")
+			}
+		}
+
 		// Parse the text for embedded links (markdown style) for HTML display
 		htmlText := parseNoteTextWithLinks(text)
 
 		notes = append(notes, Note{
 			Date:     formattedDate,
+			EndDate:  formattedEndDate,
 			Text:     text,                    // Store raw text
 			HTMLText: template.HTML(htmlText), // Store HTML version
 			Teams:    teams,
@@ -908,12 +923,16 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	for i, item := range scheduleItems {
 		if item.IsNote {
 			// Determine if note is past (before start of today)
-			noteDate := parseDateForSorting(item.Note.Date)
+			// Use EndDate if set (for multi-day notes), otherwise use Date
+			dateToCheck := item.Note.Date
+			if item.Note.EndDate != "" {
+				dateToCheck = item.Note.EndDate
+			}
+			noteDate := parseDateForSorting(dateToCheck)
 			isPastNote := false
 			if noteDate.Year() != 2099 {
-				// A note is past if its date is before today (comparing at midnight)
-				// This ensures a note dated 11/22 displays all day on 11/22, and
-				// becomes past at 12:00am on 11/23
+				// A note is past if its end date is before today (comparing at midnight)
+				// For multi-day notes, this ensures they remain visible through the last day
 				startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 				isPastNote = noteDate.Before(startOfToday)
 			}
@@ -1209,15 +1228,22 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 
 	// Add note events (all-day events)
 	for _, note := range notesToExport {
-		// Parse date
+		// Parse start date
 		dateObj := parseDateForSorting(note.Date)
 		if dateObj.Year() == 2099 {
 			continue // Skip notes with invalid dates
 		}
 
+		// Parse end date (use EndDate if present, otherwise use Date)
+		endDateObj := dateObj
+		if note.EndDate != "" && note.EndDate != note.Date {
+			endDateObj = parseDateForSorting(note.EndDate)
+		}
+
 		// All-day event for notes
+		// For iCalendar, DTEND is exclusive, so we add 1 day to the end date
 		startTime := time.Date(dateObj.Year(), dateObj.Month(), dateObj.Day(), 0, 0, 0, 0, time.UTC)
-		endTime := startTime.Add(24 * time.Hour)
+		endTime := time.Date(endDateObj.Year(), endDateObj.Month(), endDateObj.Day(), 0, 0, 0, 0, time.UTC).Add(24 * time.Hour)
 
 		// Create event UID
 		uid := fmt.Sprintf("note-%s-%s@lightningschedule.local",
