@@ -129,7 +129,7 @@ type TemplateData struct {
 
 // Functions
 func fetchLocations() ([]Location, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Get(googleSheetLocationsCSVURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching locations sheet: %v", err)
@@ -175,7 +175,7 @@ func fetchLocations() ([]Location, error) {
 }
 
 func fetchTeams() ([]Team, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Get(googleSheetTeamsCSVURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching teams sheet: %v", err)
@@ -283,7 +283,7 @@ func findTeamByName(teamName string) *Team {
 }
 
 func fetchGoogleSheetGames() ([]Game, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Get(googleSheetCSVURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching Google Sheet: %v", err)
@@ -424,7 +424,7 @@ func parseNoteTextWithLinks(text string) string {
 }
 
 func fetchGoogleSheetNotes() ([]Note, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	resp, err := client.Get(googleSheetNotesCSVURL)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching Google Sheet notes: %v", err)
@@ -498,7 +498,7 @@ func fetchGoogleSheetNotes() ([]Note, error) {
 }
 
 func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 
 	// Create request with browser-like headers to avoid Cloudflare blocking
 	req, err := http.NewRequest("GET", url, nil)
