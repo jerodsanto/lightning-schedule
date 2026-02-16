@@ -58,8 +58,7 @@ type Team struct {
 	Slug     string
 	CssClass string
 	Order    int
-	CBLLink1 string
-	CBLLink2 string
+	CBLLinks []string
 	CBLName  string
 }
 
@@ -203,8 +202,14 @@ func fetchTeams() ([]Team, error) {
 		}
 
 		name := getCellValue(headers, record, "Name")
-		cblLink1 := getCellValue(headers, record, "CBLLink1")
-		cblLink2 := getCellValue(headers, record, "CBLLink2")
+		cblLinksRaw := getCellValue(headers, record, "CBLLinks")
+		var cblLinks []string
+		for _, link := range strings.Split(cblLinksRaw, ",") {
+			link = strings.TrimSpace(link)
+			if link != "" {
+				cblLinks = append(cblLinks, link)
+			}
+		}
 		cblName := getCellValue(headers, record, "CBLName")
 		slug := getCellValue(headers, record, "Slug")
 		css := getCellValue(headers, record, "CSS")
@@ -219,8 +224,7 @@ func fetchTeams() ([]Team, error) {
 			Slug:     slug,
 			CssClass: css,
 			Order:    order,
-			CBLLink1: cblLink1,
-			CBLLink2: cblLink2,
+			CBLLinks: cblLinks,
 			CBLName:  cblName,
 		})
 		order++
@@ -570,7 +574,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 				score := ""
 				result := ""
 
-				if visitor == htmlName {
+				if strings.HasPrefix(visitor, htmlName) {
 					opponent = home
 					homeAway = "Away"
 					if visitorScore != "×" && homeScore != "×" && visitorScore != "" && homeScore != "" {
@@ -586,7 +590,7 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 					} else {
 						score = ""
 					}
-				} else if home == htmlName {
+				} else if strings.HasPrefix(home, htmlName) {
 					opponent = visitor
 					homeAway = "Home"
 					if visitorScore != "×" && homeScore != "×" && visitorScore != "" && homeScore != "" {
@@ -1319,16 +1323,8 @@ func main() {
 
 	// Fetch games from team URLs (skip teams without URLs)
 	for _, team := range AllTeams {
-		if team.CBLLink1 != "" {
-			games, err := scrapeTeamSchedule(team.Name, team.CBLLink1, team.CBLName, team.CssClass)
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-			} else {
-				allGames = append(allGames, games...)
-			}
-		}
-		if team.CBLLink2 != "" {
-			games, err := scrapeTeamSchedule(team.Name, team.CBLLink2, team.CBLName, team.CssClass)
+		for _, link := range team.CBLLinks {
+			games, err := scrapeTeamSchedule(team.Name, link, team.CBLName, team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
 			} else {
