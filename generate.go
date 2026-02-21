@@ -733,9 +733,11 @@ func (g Game) IsPastGame(gameDate time.Time, now time.Time) bool {
 	// A game is considered past if:
 	// 1. It has a result (W or L), OR
 	// 2. The game date is valid (not year 2099) AND the date is before today
-	// Compare at midnight so games show all day on their date
-	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-	return g.Result != "" || (gameDate.Year() != 2099 && gameDate.Before(startOfToday))
+	// Compare calendar dates only (year/month/day) to avoid timezone issues
+	// since parseDateForSorting returns UTC but now is in Central time
+	todayDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	gameDateOnly := time.Date(gameDate.Year(), gameDate.Month(), gameDate.Day(), 0, 0, 0, 0, time.UTC)
+	return g.Result != "" || (gameDate.Year() != 2099 && gameDateOnly.Before(todayDate))
 }
 
 func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTeam *Team) error {
@@ -886,7 +888,9 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		return teams[i].Order < teams[j].Order
 	})
 
-	now := time.Now().UTC()
+	nowUTC := time.Now().UTC()
+	centralLoc, _ := time.LoadLocation("America/Chicago")
+	now := time.Now().In(centralLoc)
 
 	// Determine page title and path based on filter
 	pageTitle := "Lightning"
@@ -935,10 +939,11 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			noteDate := parseDateForSorting(dateToCheck)
 			isPastNote := false
 			if noteDate.Year() != 2099 {
-				// A note is past if its end date is before today (comparing at midnight)
-				// For multi-day notes, this ensures they remain visible through the last day
-				startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-				isPastNote = noteDate.Before(startOfToday)
+				// A note is past if its end date is before today
+				// Compare calendar dates only to avoid timezone issues
+				todayDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+				noteDateOnly := time.Date(noteDate.Year(), noteDate.Month(), noteDate.Day(), 0, 0, 0, 0, time.UTC)
+				isPastNote = noteDateOnly.Before(todayDate)
 			}
 
 			templateItems = append(templateItems, TemplateScheduleItem{
@@ -1041,8 +1046,8 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		PageTitle:      pageTitle,
 		PagePath:       pagePath,
 		ProdDomain:     domain,
-		UpdatedUTC:     now.Format(time.RFC3339),
-		UpdatedDisplay: now.Format("1/2/06") + " at " + now.Format("3:04PM") + " UTC",
+		UpdatedUTC:     nowUTC.Format(time.RFC3339),
+		UpdatedDisplay: nowUTC.Format("1/2/06") + " at " + nowUTC.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == nil,
 		TeamRecord:     teamRecord,
 		Teams:          teamButtons,
