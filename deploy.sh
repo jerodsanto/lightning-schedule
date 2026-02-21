@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-HOST="mydh"
+HOST="dh"
 BINARY="lightning-schedule"
 WEB_DIR="~/schedule.omahalightningbasketball.com"
 SCRIPT_DIR="~/scripts"
