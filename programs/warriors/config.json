@@ -1,0 +1,14 @@
+{
+  "name": "Warriors",
+  "domain": "",
+  "sheetID": "",
+  "gids": {
+    "schedule": "",
+    "notes": "",
+    "locations": "",
+    "teams": ""
+  },
+  "themeColor": "#c8102e",
+  "icalProdID": "-//Warriors//Basketball Schedule//EN",
+  "icalCalName": "Warriors Schedule"
+}
