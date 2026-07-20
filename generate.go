@@ -64,6 +64,9 @@ func loadProgramConfig(fsys fs.FS, name string) (*ProgramConfig, error) {
 	if c.Name == "" || c.SheetID == "" {
 		return nil, fmt.Errorf("programs/%s/config.json: name and sheetID are required (copy the sheet ID from the Google Sheet URL)", name)
 	}
+	if c.Domain == "" {
+		return nil, fmt.Errorf("programs/%s/config.json: domain is required (the site's production hostname, e.g. schedule.example.com)", name)
+	}
 	for _, tab := range []string{"schedule", "notes", "locations", "teams"} {
 		if c.Gids[tab] == "" {
 			return nil, fmt.Errorf("programs/%s/config.json: gids.%s is required (open that tab in the Google Sheet and copy the gid= value from the URL)", name, tab)

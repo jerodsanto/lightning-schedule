@@ -60,12 +60,22 @@ func TestLoadProgramConfigMissingSheetID(t *testing.T) {
 }
 
 func TestLoadProgramConfigMissingGid(t *testing.T) {
-	_, err := loadProgramConfig(testFS(`{"name": "Test", "sheetID": "abc", "gids": {"schedule": "0"}}`), "test")
+	_, err := loadProgramConfig(testFS(`{"name": "Test", "domain": "example.com", "sheetID": "abc", "gids": {"schedule": "0"}}`), "test")
 	if err == nil {
 		t.Fatal("expected error for missing gids")
 	}
 	if !strings.Contains(err.Error(), "gids.notes") {
 		t.Errorf("error should mention gids.notes, got: %v", err)
+	}
+}
+
+func TestLoadProgramConfigMissingDomain(t *testing.T) {
+	_, err := loadProgramConfig(testFS(`{"name": "Test", "sheetID": "abc123", "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"}}`), "test")
+	if err == nil {
+		t.Fatal("expected error for missing domain")
+	}
+	if !strings.Contains(err.Error(), "domain") {
+		t.Errorf("error should mention domain, got: %v", err)
 	}
 }
 
