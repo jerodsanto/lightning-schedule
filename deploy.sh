@@ -10,14 +10,14 @@ HOST="dh"
 BINARY="lightning-schedule"
 SCRIPT_DIR="~/scripts"
 
-# Programs to deploy. Add "warriors" once its domain and web dir exist.
-PROGRAMS=("lightning")
+# Programs to deploy
+PROGRAMS=("lightning" "warriors")
 
 # macOS ships bash 3.2 (no associative arrays), hence the case statement
 web_dir() {
   case "$1" in
     lightning) echo "~/schedule.omahalightningbasketball.com" ;;
-    # warriors) echo "~/schedule.WARRIORS-DOMAIN-HERE" ;;
+    warriors) echo "~/schedule.omahawarriors.org" ;;
     *) echo "" ;;
   esac
 }
