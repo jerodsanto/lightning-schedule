@@ -1,12 +1,12 @@
 {
   "name": "Warriors",
-  "domain": "",
-  "sheetID": "",
+  "domain": "schedule.omahawarriors.org",
+  "sheetID": "1tnqcdaAvHcdJqvYoxU_29fsZ2zFUsouo7k5qy02C8_o",
   "gids": {
-    "schedule": "",
-    "notes": "",
-    "locations": "",
-    "teams": ""
+    "schedule": "0",
+    "notes": "436458989",
+    "locations": "1311642203",
+    "teams": "440511811"
   },
   "themeColor": "#c8102e",
   "icalProdID": "-//Warriors//Basketball Schedule//EN",
