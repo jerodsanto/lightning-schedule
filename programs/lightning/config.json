@@ -1,0 +1,14 @@
+{
+  "name": "Lightning",
+  "domain": "schedule.omahalightningbasketball.com",
+  "sheetID": "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ",
+  "gids": {
+    "schedule": "0",
+    "notes": "436458989",
+    "locations": "1311642203",
+    "teams": "440511811"
+  },
+  "themeColor": "#fbcb44",
+  "icalProdID": "-//Omaha Lightning//Basketball Schedule//EN",
+  "icalCalName": "Lightning Schedule"
+}

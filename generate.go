@@ -1,11 +1,14 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"encoding/csv"
+	"encoding/json"
+	"flag"
 	"fmt"
 	"html/template"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,13 +21,59 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// Constants
-const domain = "schedule.omahalightningbasketball.com"
-const googleSheetID = "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ"
-const googleSheetCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv"
-const googleSheetNotesCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=436458989"
-const googleSheetLocationsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=1311642203"
-const googleSheetTeamsCSVURL = "https://docs.google.com/spreadsheets/d/" + googleSheetID + "/export?format=csv&gid=440511811"
+// ProgramConfig holds everything specific to one program (Lightning, Warriors, ...)
+type ProgramConfig struct {
+	Name        string            `json:"name"`
+	Domain      string            `json:"domain"`
+	SheetID     string            `json:"sheetID"`
+	Gids        map[string]string `json:"gids"`
+	ThemeColor  string            `json:"themeColor"`
+	ICalProdID  string            `json:"icalProdID"`
+	ICalCalName string            `json:"icalCalName"`
+}
+
+//go:embed programs/*/config.json
+var programsFS embed.FS
+
+var cfg *ProgramConfig
+
+func listPrograms(fsys fs.FS) []string {
+	entries, err := fs.ReadDir(fsys, "programs")
+	if err != nil {
+		return nil
+	}
+	var names []string
+	for _, e := range entries {
+		if e.IsDir() {
+			names = append(names, e.Name())
+		}
+	}
+	return names
+}
+
+func loadProgramConfig(fsys fs.FS, name string) (*ProgramConfig, error) {
+	data, err := fs.ReadFile(fsys, "programs/"+name+"/config.json")
+	if err != nil {
+		return nil, fmt.Errorf("unknown program %q (available: %s)", name, strings.Join(listPrograms(fsys), ", "))
+	}
+	var c ProgramConfig
+	if err := json.Unmarshal(data, &c); err != nil {
+		return nil, fmt.Errorf("invalid programs/%s/config.json: %v", name, err)
+	}
+	if c.Name == "" || c.SheetID == "" {
+		return nil, fmt.Errorf("programs/%s/config.json: name and sheetID are required (copy the sheet ID from the Google Sheet URL)", name)
+	}
+	for _, tab := range []string{"schedule", "notes", "locations", "teams"} {
+		if c.Gids[tab] == "" {
+			return nil, fmt.Errorf("programs/%s/config.json: gids.%s is required (open that tab in the Google Sheet and copy the gid= value from the URL)", name, tab)
+		}
+	}
+	return &c, nil
+}
+
+func (c *ProgramConfig) csvURL(tab string) string {
+	return "https://docs.google.com/spreadsheets/d/" + c.SheetID + "/export?format=csv&gid=" + c.Gids[tab]
+}
 
 // Variables
 //
@@ -129,7 +178,7 @@ type TemplateData struct {
 // Functions
 func fetchLocations() ([]Location, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(googleSheetLocationsCSVURL)
+	resp, err := client.Get(cfg.csvURL("locations"))
 	if err != nil {
 		return nil, fmt.Errorf("error fetching locations sheet: %v", err)
 	}
@@ -175,7 +224,7 @@ func fetchLocations() ([]Location, error) {
 
 func fetchTeams() ([]Team, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(googleSheetTeamsCSVURL)
+	resp, err := client.Get(cfg.csvURL("teams"))
 	if err != nil {
 		return nil, fmt.Errorf("error fetching teams sheet: %v", err)
 	}
@@ -288,7 +337,7 @@ func findTeamByName(teamName string) *Team {
 
 func fetchGoogleSheetGames() ([]Game, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(googleSheetCSVURL)
+	resp, err := client.Get(cfg.csvURL("schedule"))
 	if err != nil {
 		return nil, fmt.Errorf("error fetching Google Sheet: %v", err)
 	}
@@ -429,7 +478,7 @@ func parseNoteTextWithLinks(text string) string {
 
 func fetchGoogleSheetNotes() ([]Note, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Get(googleSheetNotesCSVURL)
+	resp, err := client.Get(cfg.csvURL("notes"))
 	if err != nil {
 		return nil, fmt.Errorf("error fetching Google Sheet notes: %v", err)
 	}
@@ -893,7 +942,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	now := time.Now().In(centralLoc)
 
 	// Determine page title and path based on filter
-	pageTitle := "Lightning"
+	pageTitle := cfg.Name
 	pagePath := "/"
 	teamRecord := ""
 
@@ -1045,7 +1094,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	data := TemplateData{
 		PageTitle:      pageTitle,
 		PagePath:       pagePath,
-		ProdDomain:     domain,
+		ProdDomain:     cfg.Domain,
 		UpdatedUTC:     nowUTC.Format(time.RFC3339),
 		UpdatedDisplay: nowUTC.Format("1/2/06") + " at " + nowUTC.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == nil,
@@ -1109,10 +1158,10 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 	// iCal header
 	ical.WriteString("BEGIN:VCALENDAR\r\n")
 	ical.WriteString("VERSION:2.0\r\n")
-	ical.WriteString("PRODID:-//Omaha Lightning//Basketball Schedule//EN\r\n")
+	ical.WriteString("PRODID:" + cfg.ICalProdID + "\r\n")
 	ical.WriteString("CALSCALE:GREGORIAN\r\n")
 	ical.WriteString("METHOD:PUBLISH\r\n")
-	ical.WriteString("X-WR-CALNAME:Lightning Schedule")
+	ical.WriteString("X-WR-CALNAME:" + cfg.ICalCalName)
 	if filterTeam != nil {
 		ical.WriteString(" - " + filterTeam.Name)
 	}
@@ -1184,7 +1233,7 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		}
 
 		// Create event UID
-		uid := fmt.Sprintf("game-%s-%s-%s@lightningschedule.local",
+		uid := fmt.Sprintf("game-%s-%s-%s@"+cfg.Domain,
 			strings.ReplaceAll(game.Team.Name, " ", ""),
 			dateObj.Format("20060102"),
 			strings.ReplaceAll(game.Time, " ", ""))
@@ -1255,7 +1304,7 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 		endTime := time.Date(endDateObj.Year(), endDateObj.Month(), endDateObj.Day(), 0, 0, 0, 0, time.UTC).Add(24 * time.Hour)
 
 		// Create event UID
-		uid := fmt.Sprintf("note-%s-%s@lightningschedule.local",
+		uid := fmt.Sprintf("note-%s-%s@"+cfg.Domain,
 			dateObj.Format("20060102"),
 			fmt.Sprintf("%x", strings.ReplaceAll(note.Text, " ", "")))
 
@@ -1311,8 +1360,17 @@ func parseMarkdownLinks(text string) string {
 func main() {
 	var allGames []Game
 
-	// Fetch teams from Google Sheet
+	program := flag.String("program", "lightning", "program to generate (directory name under programs/)")
+	flag.Parse()
+
 	var err error
+	cfg, err = loadProgramConfig(programsFS, *program)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	// Fetch teams from Google Sheet
 	AllTeams, err = fetchTeams()
 	if err != nil {
 		fmt.Printf("Error fetching teams: %v\n", err)
@@ -1358,10 +1416,10 @@ func main() {
 		allNotes = []Note{} // Use empty slice if fetch fails
 	}
 
-	// Get output directory from command line argument or use default "dist"
-	outputDir := "dist"
-	if len(os.Args) > 1 {
-		outputDir = os.Args[1]
+	// Get output directory from command line argument or use default "dist/<program>"
+	outputDir := filepath.Join("dist", *program)
+	if flag.NArg() > 0 {
+		outputDir = flag.Arg(0)
 	}
 
 	// Expand tilde if present
