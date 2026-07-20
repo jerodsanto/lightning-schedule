@@ -1,0 +1,69 @@
+:root {
+  --accent: #fbcb44;
+  --accent-hover: #ffd65f;
+}
+
+/* Team-specific styles */
+.team-badge.varsity {
+  background-color: #f59c44;
+  color: black;
+}
+.team-badge.jv {
+  background-color: #44a15b;
+  color: white;
+}
+.team-badge.gold {
+  background-color: #ffd700;
+  color: black;
+}
+.team-badge.white {
+  background-color: #ffffff;
+  color: black;
+  border: 1px solid black;
+}
+.team-badge.blue {
+  background-color: #5b9de9;
+  color: white;
+}
+.team-badge.red {
+  background-color: #d53a44;
+  color: white;
+}
+.team-badge.black {
+  background-color: #000000;
+  color: white;
+}
+
+/* Team badge adjustments for dark mode */
+@media (prefers-color-scheme: dark) {
+  .team-badge.varsity {
+    background-color: #f59c44;
+    color: black;
+  }
+  .team-badge.jv {
+    background-color: #44a15b;
+    color: white;
+  }
+  .team-badge.gold {
+    background-color: #ffd700;
+    color: black;
+  }
+  .team-badge.white {
+    background-color: #e8e8e8;
+    color: black;
+    border: 1px solid #666;
+  }
+  .team-badge.blue {
+    background-color: #5b9de9;
+    color: white;
+  }
+  .team-badge.red {
+    background-color: #d53a44;
+    color: white;
+  }
+  .team-badge.black {
+    background-color: #333;
+    color: white;
+    border: 1px solid #555;
+  }
+}

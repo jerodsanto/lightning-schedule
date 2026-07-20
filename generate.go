@@ -32,10 +32,11 @@ type ProgramConfig struct {
 	ICalCalName string            `json:"icalCalName"`
 }
 
-//go:embed programs/*/config.json
+//go:embed programs/*/config.json programs/*/theme.css
 var programsFS embed.FS
 
 var cfg *ProgramConfig
+var themeCSS string
 
 func listPrograms(fsys fs.FS) []string {
 	entries, err := fs.ReadDir(fsys, "programs")
@@ -164,6 +165,7 @@ type TemplateData struct {
 	ProdDomain     string
 	PageTitle      string
 	PagePath       string
+	ThemeColor     string
 	UpdatedUTC     string
 	UpdatedDisplay string
 	AllTeamsLink   string
@@ -1095,13 +1097,14 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		PageTitle:      pageTitle,
 		PagePath:       pagePath,
 		ProdDomain:     cfg.Domain,
+		ThemeColor:     cfg.ThemeColor,
 		UpdatedUTC:     nowUTC.Format(time.RFC3339),
 		UpdatedDisplay: nowUTC.Format("1/2/06") + " at " + nowUTC.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == nil,
 		TeamRecord:     teamRecord,
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
-		StylesCSS:      template.CSS(stylesCSS),
+		StylesCSS:      template.CSS(stylesCSS + "\n" + themeCSS),
 		ScheduleJS:     template.JS(scheduleJS),
 	}
 
@@ -1369,6 +1372,13 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	theme, err := programsFS.ReadFile("programs/" + *program + "/theme.css")
+	if err != nil {
+		fmt.Printf("programs/%s/theme.css is required: %v\n", *program, err)
+		os.Exit(1)
+	}
+	themeCSS = string(theme)
 
 	// Fetch teams from Google Sheet
 	AllTeams, err = fetchTeams()
