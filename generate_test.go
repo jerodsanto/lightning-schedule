@@ -100,6 +100,28 @@ func setupGenerateHTMLTest() {
 	themeCSS = ""
 }
 
+func TestGenerateHTMLTeamNavWithoutGames(t *testing.T) {
+	setupGenerateHTMLTest()
+	AllTeams = []Team{
+		{Name: "Blue", Slug: "blue", CssClass: "blue", Order: 1},
+		{Name: "Ruby", Slug: "ruby", CssClass: "ruby", Order: 2},
+	}
+	defer func() { AllTeams = nil }()
+	out := filepath.Join(t.TempDir(), "index.html")
+	if err := generateHTML(nil, nil, out, nil); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	html, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	for _, slug := range []string{"blue", "ruby"} {
+		if !strings.Contains(string(html), `href="/`+slug+`"`) {
+			t.Errorf("expected nav button for team %q even with no games", slug)
+		}
+	}
+}
+
 func TestGenerateHTMLNoGames(t *testing.T) {
 	setupGenerateHTMLTest()
 	out := filepath.Join(t.TempDir(), "index.html")

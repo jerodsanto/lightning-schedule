@@ -929,21 +929,12 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		return !isTBDA
 	})
 
-	// Get unique teams and sort by their Order field
-	teamSet := make(map[*Team]bool)
-	for _, game := range allGames {
-		teamSet[game.Team] = true
-	}
-
+	// Nav lists every team from the Teams sheet (already in sheet order),
+	// including teams with no games yet — their pages exist regardless
 	var teams []*Team
-	for team := range teamSet {
-		teams = append(teams, team)
+	for i := range AllTeams {
+		teams = append(teams, &AllTeams[i])
 	}
-
-	// Sort teams by their Order field
-	sort.Slice(teams, func(i, j int) bool {
-		return teams[i].Order < teams[j].Order
-	})
 
 	nowUTC := time.Now().UTC()
 	centralLoc, _ := time.LoadLocation("America/Chicago")
