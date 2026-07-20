@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -86,5 +88,56 @@ func TestLoadEmbeddedLightningConfig(t *testing.T) {
 	}
 	if c.SheetID != "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ" {
 		t.Errorf("wrong sheetID: %q", c.SheetID)
+	}
+}
+
+func setupGenerateHTMLTest() {
+	cfg = &ProgramConfig{
+		Name:       "Test",
+		Domain:     "example.com",
+		ThemeColor: "#ffffff",
+	}
+	themeCSS = ""
+}
+
+func TestGenerateHTMLNoGames(t *testing.T) {
+	setupGenerateHTMLTest()
+	out := filepath.Join(t.TempDir(), "index.html")
+	if err := generateHTML(nil, nil, out, nil); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	html, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	if !strings.Contains(string(html), "Game schedule coming soon!") {
+		t.Error("expected placeholder message in output with no games")
+	}
+	if strings.Contains(string(html), `class="schedule-body"`) {
+		t.Error("expected schedule tables to be omitted with no schedule items")
+	}
+}
+
+func TestGenerateHTMLWithGames(t *testing.T) {
+	setupGenerateHTMLTest()
+	games := []Game{{
+		Team:     &Team{Name: "10U Black", Slug: "10ublack", CssClass: "black", Order: 1},
+		Date:     "Saturday, October 18, 2025",
+		Time:     "1:00 PM",
+		Opponent: "Rivals",
+	}}
+	out := filepath.Join(t.TempDir(), "index.html")
+	if err := generateHTML(games, nil, out, nil); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	html, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	if strings.Contains(string(html), "Game schedule coming soon!") {
+		t.Error("placeholder message should not appear when games exist")
+	}
+	if !strings.Contains(string(html), "Rivals") {
+		t.Error("expected game opponent in output")
 	}
 }

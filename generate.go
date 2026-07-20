@@ -174,6 +174,7 @@ type TemplateData struct {
 	AllTeamsLink   string
 	IsAllTeams     bool
 	TeamRecord     string
+	HasGames       bool
 	Teams          []TeamButton
 	ScheduleItems  []TemplateScheduleItem
 	StylesCSS      template.CSS
@@ -1105,6 +1106,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		UpdatedDisplay: nowUTC.Format("1/2/06") + " at " + nowUTC.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == nil,
 		TeamRecord:     teamRecord,
+		HasGames:       len(gamesToDisplay) > 0,
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
 		StylesCSS:      template.CSS(stylesCSS + "\n" + themeCSS),
@@ -1398,11 +1400,13 @@ func main() {
 	}
 
 	// Fetch games from team URLs (skip teams without URLs)
+	fetchErrors := 0
 	for _, team := range AllTeams {
 		for _, link := range team.CBLLinks {
 			games, err := scrapeTeamSchedule(team.Name, link, team.CBLName, team.CssClass)
 			if err != nil {
 				fmt.Printf("Error: %v\n", err)
+				fetchErrors++
 			} else {
 				allGames = append(allGames, games...)
 			}
@@ -1413,12 +1417,13 @@ func main() {
 	sheetGames, err := fetchGoogleSheetGames()
 	if err != nil {
 		fmt.Printf("Error fetching Google Sheet: %v\n", err)
+		fetchErrors++
 	} else {
 		allGames = append(allGames, sheetGames...)
 	}
 
-	if len(allGames) == 0 {
-		fmt.Println("No games found. Please check the URLs and try again.")
+	if len(allGames) == 0 && fetchErrors > 0 {
+		fmt.Println("No games found and fetch errors occurred; leaving existing output untouched.")
 		os.Exit(1)
 	}
 

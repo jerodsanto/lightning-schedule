@@ -68,6 +68,11 @@
       <button id="onlyUpcoming" class="filter-btn">Only Upcoming</button>
     </div>
 
+    {{if not .HasGames}}
+    <p class="coming-soon">Game schedule coming soon!</p>
+    {{end}}
+
+    {{if .ScheduleItems}}
     <div class="schedule-header">
       <table>
         <thead>
@@ -121,6 +126,7 @@
         </tbody>
       </table>
     </div>
+    {{end}}
 
     <div class="calendar">
       <p class="instructions">
