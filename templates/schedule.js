@@ -122,6 +122,8 @@ function throttle(fn, context) {
 function syncTableHeaders() {
   const headerTable = document.querySelector(".schedule-header table");
   const bodyContainer = document.querySelector(".schedule-body");
+  // Placeholder-only pages (no games or notes) render without the schedule tables
+  if (!headerTable || !bodyContainer) return;
   const bodyTable = bodyContainer.querySelector("table");
 
   // Throttled sync for horizontal scroll (runs ~60 FPS max)
