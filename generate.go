@@ -24,6 +24,7 @@ import (
 // ProgramConfig holds everything specific to one program (Lightning, Warriors, ...)
 type ProgramConfig struct {
 	Name        string            `json:"name"`
+	Emoji       string            `json:"emoji"`
 	Domain      string            `json:"domain"`
 	SheetID     string            `json:"sheetID"`
 	Gids        map[string]string `json:"gids"`
@@ -167,6 +168,7 @@ type TemplateScheduleItem struct {
 type TemplateData struct {
 	ProdDomain     string
 	PageTitle      string
+	PageEmoji      string
 	PagePath       string
 	ThemeColor     string
 	UpdatedUTC     string
@@ -1099,6 +1101,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 	// Prepare template data
 	data := TemplateData{
 		PageTitle:      pageTitle,
+		PageEmoji:      cfg.Emoji,
 		PagePath:       pagePath,
 		ProdDomain:     cfg.Domain,
 		ThemeColor:     cfg.ThemeColor,
