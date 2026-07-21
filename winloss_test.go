@@ -18,8 +18,8 @@ func readFile(t *testing.T, path string) string {
 	return string(data)
 }
 
-// Characterization tests for the current W/L determination logic. These pin
-// existing behavior (including quirks like ties counting as losses) so any
+// Tests for W/L/T determination on both score paths, plus quirks pinned by
+// characterization (malformed scores pass through with no result) so any
 // intentional change to the logic shows up as explicit test updates.
 
 func TestParseGoogleSheetGamesScoreResult(t *testing.T) {
@@ -34,7 +34,7 @@ func TestParseGoogleSheetGamesScoreResult(t *testing.T) {
 	}{
 		{"win", "45-30", "W 45-30", "W"},
 		{"loss", "30-45", "L 30-45", "L"},
-		{"tie counts as loss", "30-30", "L 30-30", "L"},
+		{"tie scored as T", "30-30", "T 30-30", "T"},
 		{"whitespace around scores trimmed", "45 - 30", "W 45-30", "W"},
 		{"empty score untouched", "", "", ""},
 		{"bare dash untouched", "-", "-", ""},
@@ -44,6 +44,9 @@ func TestParseGoogleSheetGamesScoreResult(t *testing.T) {
 		{"prefixed loss passes through and counts", "L 30-45", "L 30-45", "L"},
 		{"bare W passes through and counts", "W", "W", "W"},
 		{"bare L passes through and counts", "L", "L", "L"},
+		{"prefixed tie passes through and counts", "T 25-25", "T 25-25", "T"},
+		{"bare T passes through and counts", "T", "T", "T"},
+		{"TBD passes through with no result", "TBD", "TBD", ""},
 	}
 
 	for _, tt := range tests {
@@ -123,9 +126,14 @@ func TestScrapeTeamScheduleScoreResult(t *testing.T) {
 			"L 20-50", "L", "Home",
 		},
 		{
-			"tie counts as loss",
+			"tie scored as T",
 			tourneyRow("1", "6:00 PM", "Lightning Blue", "25", "25", "Rivals"),
-			"L 25-25", "L", "Away",
+			"T 25-25", "T", "Away",
+		},
+		{
+			"tie as home scored as T",
+			tourneyRow("1", "6:00 PM", "Rivals", "25", "25", "Lightning Blue"),
+			"T 25-25", "T", "Home",
 		},
 		{
 			"unplayed game (× markers) has no score or result",
@@ -176,7 +184,7 @@ func TestGenerateHTMLTeamRecord(t *testing.T) {
 	games := []Game{
 		{Team: team, Date: "Saturday, October 18, 2025", Time: "1:00 PM", Opponent: "Rivals", Score: "W 45-30", Result: "W"},
 		{Team: team, Date: "Saturday, October 25, 2025", Time: "1:00 PM", Opponent: "Sharks", Score: "W 40-20", Result: "W"},
-		{Team: team, Date: "Saturday, November 1, 2025", Time: "1:00 PM", Opponent: "Hawks", Score: "L 25-25", Result: "L"},
+		{Team: team, Date: "Saturday, November 1, 2025", Time: "1:00 PM", Opponent: "Hawks", Score: "L 20-30", Result: "L"},
 		{Team: team, Date: "Saturday, November 8, 2025", Time: "1:00 PM", Opponent: "Wolves"},
 	}
 	out := t.TempDir() + "/index.html"
@@ -185,7 +193,24 @@ func TestGenerateHTMLTeamRecord(t *testing.T) {
 	}
 	html := readFile(t, out)
 	if !strings.Contains(html, "[2-1]") {
-		t.Error("expected team record [2-1] in output (unplayed games excluded)")
+		t.Error("expected team record [2-1] with no ties (unplayed games excluded)")
+	}
+}
+
+func TestGenerateHTMLTeamRecordWithTies(t *testing.T) {
+	setupGenerateHTMLTest()
+	team := &Team{Name: "Blue", Slug: "blue", CssClass: "blue", Order: 1}
+	games := []Game{
+		{Team: team, Date: "Saturday, October 18, 2025", Time: "1:00 PM", Opponent: "Rivals", Score: "W 45-30", Result: "W"},
+		{Team: team, Date: "Saturday, October 25, 2025", Time: "1:00 PM", Opponent: "Sharks", Score: "L 20-40", Result: "L"},
+		{Team: team, Date: "Saturday, November 1, 2025", Time: "1:00 PM", Opponent: "Hawks", Score: "T 25-25", Result: "T"},
+	}
+	out := t.TempDir() + "/index.html"
+	if err := generateHTML(games, nil, out, team); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	if !strings.Contains(readFile(t, out), "[1-1-1]") {
+		t.Error("expected team record [1-1-1] once a tie exists")
 	}
 }
 

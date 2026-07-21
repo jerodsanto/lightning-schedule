@@ -126,7 +126,7 @@ type Game struct {
 	Opponent     string
 	HomeAway     string
 	Score        string
-	Result       string // "W", "L", or "" for unplayed games
+	Result       string // "W", "L", "T", or "" for unplayed games
 }
 
 // Note represents a note to display on a specific date
@@ -417,15 +417,19 @@ func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
 			location = "TBD"
 		}
 
-		// Parse score and add W/L if score is in format "ourScore-theirScore".
-		// Scores already prefixed with W or L pass through as-is but still
-		// count toward the team record.
+		// Parse score and add W/L/T if score is in format "ourScore-theirScore".
+		// Scores already prefixed with W, L, or T pass through as-is but still
+		// count toward the team record ("TBD" is not a tie).
 		result := ""
 		trimmedScore := strings.TrimSpace(score)
-		if strings.HasPrefix(trimmedScore, "W") {
+		if strings.HasPrefix(trimmedScore, "TBD") {
+			// no result
+		} else if strings.HasPrefix(trimmedScore, "W") {
 			result = "W"
 		} else if strings.HasPrefix(trimmedScore, "L") {
 			result = "L"
+		} else if strings.HasPrefix(trimmedScore, "T") {
+			result = "T"
 		} else if score != "" && score != "-" {
 			scoreParts := strings.Split(score, "-")
 			if len(scoreParts) == 2 {
@@ -434,8 +438,10 @@ func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
 				if err1 == nil && err2 == nil {
 					if ourScore > theirScore {
 						result = "W"
-					} else {
+					} else if ourScore < theirScore {
 						result = "L"
+					} else {
+						result = "T"
 					}
 					// Format score with W/L prefix to match team schedule format
 					score = fmt.Sprintf("%s %s-%s", result, strings.TrimSpace(scoreParts[0]), strings.TrimSpace(scoreParts[1]))
@@ -651,8 +657,10 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 						theirScore, _ := strconv.Atoi(homeScore)
 						if ourScore > theirScore {
 							result = "W"
-						} else {
+						} else if ourScore < theirScore {
 							result = "L"
+						} else {
+							result = "T"
 						}
 						score = fmt.Sprintf("%s %s-%s", result, visitorScore, homeScore)
 					} else {
@@ -666,12 +674,13 @@ func scrapeTeamSchedule(displayName, url, htmlName, CssClass string) ([]Game, er
 						ourScore, _ := strconv.Atoi(homeScore)
 						theirScore, _ := strconv.Atoi(visitorScore)
 						if ourScore > theirScore {
-							score = fmt.Sprintf("W %s-%s", homeScore, visitorScore)
 							result = "W"
-						} else {
-							score = fmt.Sprintf("L %s-%s", homeScore, visitorScore)
+						} else if ourScore < theirScore {
 							result = "L"
+						} else {
+							result = "T"
 						}
+						score = fmt.Sprintf("%s %s-%s", result, homeScore, visitorScore)
 					} else {
 						score = ""
 					}
@@ -960,17 +969,23 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		pageTitle = filterTeam.Name
 		pagePath = "/" + filterTeam.Slug + "/"
 
-		// Calculate W-L record for team pages
+		// Calculate W-L record for team pages (W-L-T once any ties exist)
 		wins := 0
 		losses := 0
+		ties := 0
 		for _, game := range gamesToDisplay {
-			if game.Result == "W" {
+			switch game.Result {
+			case "W":
 				wins++
-			} else if game.Result == "L" {
+			case "L":
 				losses++
+			case "T":
+				ties++
 			}
 		}
-		if wins > 0 || losses > 0 {
+		if ties > 0 {
+			teamRecord = fmt.Sprintf(" [%d-%d-%d]", wins, losses, ties)
+		} else if wins > 0 || losses > 0 {
 			teamRecord = fmt.Sprintf(" [%d-%d]", wins, losses)
 		}
 	}
