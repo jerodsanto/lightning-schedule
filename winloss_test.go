@@ -40,7 +40,10 @@ func TestParseGoogleSheetGamesScoreResult(t *testing.T) {
 		{"bare dash untouched", "-", "-", ""},
 		{"three-part score untouched", "45-30-2", "45-30-2", ""},
 		{"non-numeric score untouched", "abc-def", "abc-def", ""},
-		{"already-prefixed score untouched, no result", "W 45-30", "W 45-30", ""},
+		{"prefixed win passes through and counts", "W 45-30", "W 45-30", "W"},
+		{"prefixed loss passes through and counts", "L 30-45", "L 30-45", "L"},
+		{"bare W passes through and counts", "W", "W", "W"},
+		{"bare L passes through and counts", "L", "L", "L"},
 	}
 
 	for _, tt := range tests {

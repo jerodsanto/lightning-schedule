@@ -417,9 +417,16 @@ func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
 			location = "TBD"
 		}
 
-		// Parse score and add W/L if score is in format "ourScore-theirScore"
+		// Parse score and add W/L if score is in format "ourScore-theirScore".
+		// Scores already prefixed with W or L pass through as-is but still
+		// count toward the team record.
 		result := ""
-		if score != "" && score != "-" {
+		trimmedScore := strings.TrimSpace(score)
+		if strings.HasPrefix(trimmedScore, "W") {
+			result = "W"
+		} else if strings.HasPrefix(trimmedScore, "L") {
+			result = "L"
+		} else if score != "" && score != "-" {
 			scoreParts := strings.Split(score, "-")
 			if len(scoreParts) == 2 {
 				ourScore, err1 := strconv.Atoi(strings.TrimSpace(scoreParts[0]))
