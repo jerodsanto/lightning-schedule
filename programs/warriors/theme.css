@@ -16,54 +16,34 @@
   background-color: #ffd700;
   color: black;
 }
-.team-badge.diamond {
-  background-color: #ffffff;
+.team-badge.silver {
+  background-color: #e6e6e6;
   color: black;
-  border: 1px solid black;
 }
 .team-badge.blue {
   background-color: #5b9de9;
   color: white;
 }
-.team-badge.ruby {
-  background-color: #d53a44;
-  color: white;
+.team-badge.red {
+  background-color: #ffcfc9;
+  color: #b10202;
+  border: 1px solid #b10202;
 }
 .team-badge.sapphire {
-  background-color: #000000;
+  background-color: #0a53a8;
   color: white;
 }
+.team-badge.ruby {
+  background-color: #b10202;
+  color: white;
+}
+.team-badge.diamond {
+  background-color: #ffffff;
+  color: black;
+  border: 1px solid black;
+}
+
 
 /* Team badge adjustments for dark mode */
 @media (prefers-color-scheme: dark) {
-  .team-badge.varsity {
-    background-color: #f59c44;
-    color: black;
-  }
-  .team-badge.jv {
-    background-color: #44a15b;
-    color: white;
-  }
-  .team-badge.gold {
-    background-color: #ffd700;
-    color: black;
-  }
-  .team-badge.diamond {
-    background-color: #e8e8e8;
-    color: black;
-    border: 1px solid #666;
-  }
-  .team-badge.blue {
-    background-color: #5b9de9;
-    color: white;
-  }
-  .team-badge.ruby {
-    background-color: #d53a44;
-    color: white;
-  }
-  .team-badge.sapphire {
-    background-color: #333;
-    color: white;
-    border: 1px solid #555;
-  }
 }
