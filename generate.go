@@ -24,6 +24,7 @@ import (
 // ProgramConfig holds everything specific to one program (Lightning, Warriors, ...)
 type ProgramConfig struct {
 	Name        string            `json:"name"`
+	Sport       string            `json:"sport"`
 	Emoji       string            `json:"emoji"`
 	Domain      string            `json:"domain"`
 	SheetID     string            `json:"sheetID"`
@@ -72,6 +73,9 @@ func loadProgramConfig(fsys fs.FS, name string) (*ProgramConfig, error) {
 		if c.Gids[tab] == "" {
 			return nil, fmt.Errorf("programs/%s/config.json: gids.%s is required (open that tab in the Google Sheet and copy the gid= value from the URL)", name, tab)
 		}
+	}
+	if c.Sport != "basketball" && c.Sport != "volleyball" {
+		return nil, fmt.Errorf("programs/%s/config.json: sport must be %q or %q, got %q", name, "basketball", "volleyball", c.Sport)
 	}
 	return &c, nil
 }

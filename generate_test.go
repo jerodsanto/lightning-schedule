@@ -10,6 +10,7 @@ import (
 
 const validConfigJSON = `{
   "name": "Test",
+  "sport": "basketball",
   "domain": "example.com",
   "sheetID": "abc123",
   "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"},
@@ -34,6 +35,9 @@ func TestLoadProgramConfig(t *testing.T) {
 	}
 	if c.Domain != "example.com" {
 		t.Errorf("Domain = %q, want %q", c.Domain, "example.com")
+	}
+	if c.Sport != "basketball" {
+		t.Errorf("Sport = %q, want %q", c.Sport, "basketball")
 	}
 	want := "https://docs.google.com/spreadsheets/d/abc123/export?format=csv&gid=1"
 	if got := c.csvURL("notes"); got != want {
@@ -81,6 +85,26 @@ func TestLoadProgramConfigMissingDomain(t *testing.T) {
 	}
 }
 
+func TestLoadProgramConfigMissingSport(t *testing.T) {
+	_, err := loadProgramConfig(testFS(`{"name": "Test", "domain": "example.com", "sheetID": "abc", "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"}}`), "test")
+	if err == nil {
+		t.Fatal("expected error for missing sport")
+	}
+	if !strings.Contains(err.Error(), "sport") {
+		t.Errorf("error should mention sport, got: %v", err)
+	}
+}
+
+func TestLoadProgramConfigInvalidSport(t *testing.T) {
+	_, err := loadProgramConfig(testFS(`{"name": "Test", "sport": "hockey", "domain": "example.com", "sheetID": "abc", "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"}}`), "test")
+	if err == nil {
+		t.Fatal("expected error for invalid sport")
+	}
+	if !strings.Contains(err.Error(), "basketball") || !strings.Contains(err.Error(), "volleyball") {
+		t.Errorf("error should list valid sports, got: %v", err)
+	}
+}
+
 func TestLoadEmbeddedLightningConfig(t *testing.T) {
 	c, err := loadProgramConfig(programsFS, "lightning")
 	if err != nil {
@@ -88,6 +112,19 @@ func TestLoadEmbeddedLightningConfig(t *testing.T) {
 	}
 	if c.SheetID != "1JG0KliyzTT8muoDPAhTJWBilE1iUQMm22XOq1H4N6aQ" {
 		t.Errorf("wrong sheetID: %q", c.SheetID)
+	}
+	if c.Sport != "basketball" {
+		t.Errorf("Sport = %q, want %q", c.Sport, "basketball")
+	}
+}
+
+func TestLoadEmbeddedWarriorsConfig(t *testing.T) {
+	c, err := loadProgramConfig(programsFS, "warriors")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if c.Sport != "volleyball" {
+		t.Errorf("Sport = %q, want %q", c.Sport, "volleyball")
 	}
 }
 
