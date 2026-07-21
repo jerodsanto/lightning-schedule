@@ -351,7 +351,11 @@ func fetchGoogleSheetGames() ([]Game, error) {
 	}
 	defer resp.Body.Close()
 
-	reader := csv.NewReader(resp.Body)
+	return parseGoogleSheetGames(resp.Body)
+}
+
+func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
+	reader := csv.NewReader(r)
 	var games []Game
 
 	// Read header row
