@@ -52,6 +52,12 @@ h1 {
 }
 .schedule-header table {
   table-layout: fixed;
+  /* JS sets an explicit width matching the body table; don't cap it */
+  max-width: none;
+}
+.schedule-header th {
+  /* Lets JS copy the body cells' border-box widths verbatim */
+  box-sizing: border-box;
 }
 .schedule-body {
   overflow-x: auto;
@@ -84,7 +90,7 @@ td a {
 td a:hover {
   color: #004499;
 }
-td.team {
+th.team, td.team {
   min-width: 60px;
 }
 td.time {

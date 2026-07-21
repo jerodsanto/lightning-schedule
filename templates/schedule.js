@@ -125,40 +125,48 @@ function syncTableHeaders() {
   // Placeholder-only pages (no games or notes) render without the schedule tables
   if (!headerTable || !bodyContainer) return;
   const bodyTable = bodyContainer.querySelector("table");
-
-  // Throttled sync for horizontal scroll (runs ~60 FPS max)
-  const throttledSync = throttle(() => {
-    headerTable.style.transform = `translateX(-${bodyContainer.scrollLeft}px)`;
-  });
-
-  bodyContainer.addEventListener("scroll", throttledSync);
-
-  // Match column widths by reading from first visible row's cells
   const headerThs = headerTable.querySelectorAll("th");
-  const firstGameRow = bodyTable.querySelector(
-    "tbody tr.game-row:not(.past-game)",
-  );
-  if (firstGameRow) {
-    const bodyCells = firstGameRow.querySelectorAll("td");
-    headerThs.forEach((headerTh, i) => {
-      if (bodyCells[i]) {
-        // Get the computed padding from the td
-        const tdStyles = window.getComputedStyle(bodyCells[i]);
-        const tdPaddingLeft = parseFloat(tdStyles.paddingLeft);
-        const tdPaddingRight = parseFloat(tdStyles.paddingRight);
 
-        // Calculate content width (offsetWidth includes padding and border)
-        const contentWidth =
-          bodyCells[i].offsetWidth - tdPaddingLeft - tdPaddingRight;
+  function syncWidths() {
+    // Any visible game row reflects the column widths; note rows span all
+    // columns and hidden (filtered) rows have no geometry to measure
+    let cells = null;
+    for (const row of bodyTable.querySelectorAll("tbody tr.game-row")) {
+      if (row.getClientRects().length) {
+        cells = row.children;
+        break;
+      }
+    }
+    if (!cells) return;
 
-        // Set the th width to content width (its padding will be added on top)
-        headerTh.style.width = `${contentWidth}px`;
+    // Pin the header table to the body table's exact width, then copy each
+    // column's border-box width (th uses box-sizing: border-box in CSS)
+    headerTable.style.width = `${bodyTable.getBoundingClientRect().width}px`;
+    headerThs.forEach((th, i) => {
+      if (cells[i]) {
+        th.style.width = `${cells[i].getBoundingClientRect().width}px`;
       }
     });
   }
+
+  // Throttled sync for horizontal scroll (runs ~60 FPS max)
+  bodyContainer.addEventListener(
+    "scroll",
+    throttle(() => {
+      headerTable.style.transform = `translateX(-${bodyContainer.scrollLeft}px)`;
+    }),
+  );
+
+  // The body table's size changes whenever its layout does (viewport resize,
+  // filter toggles hiding rows, fonts loading), so observing it re-syncs all
+  if (window.ResizeObserver) {
+    new ResizeObserver(throttle(syncWidths)).observe(bodyTable);
+  } else {
+    window.addEventListener("resize", throttle(syncWidths));
+  }
+  syncWidths();
 }
 
 document.addEventListener("DOMContentLoaded", applyFilters);
 document.addEventListener("DOMContentLoaded", handleTimestamps);
 document.addEventListener("DOMContentLoaded", syncTableHeaders);
-window.addEventListener("resize", syncTableHeaders);
