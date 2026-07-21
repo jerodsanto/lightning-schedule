@@ -131,6 +131,7 @@ func TestLoadEmbeddedWarriorsConfig(t *testing.T) {
 func setupGenerateHTMLTest() {
 	cfg = &ProgramConfig{
 		Name:       "Test",
+		Sport:      "basketball",
 		Domain:     "example.com",
 		ThemeColor: "#ffffff",
 	}

@@ -164,7 +164,7 @@ type TemplateScheduleItem struct {
 	Note            *Note
 	DisplayDateTime string
 	LocationHTML    template.HTML
-	JerseyText      string
+	RoleText        string
 	OpponentDisplay string
 	ScoreDisplay    string
 }
@@ -180,6 +180,7 @@ type TemplateData struct {
 	AllTeamsLink   string
 	IsAllTeams     bool
 	TeamRecord     string
+	RoleHeader     string
 	HasGames       bool
 	Teams          []TeamButton
 	ScheduleItems  []TemplateScheduleItem
@@ -382,7 +383,11 @@ func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
 		date := getCellValue(headers, record, "Date")
 		timeStr := getCellValue(headers, record, "Time")
 		location := getCellValue(headers, record, "Location")
-		jersey := getCellValue(headers, record, "Jersey")
+		// The sheet column was renamed Jersey -> Role; accept either
+		role := getCellValue(headers, record, "Role")
+		if role == "" {
+			role = getCellValue(headers, record, "Jersey")
+		}
 		opponent := getCellValue(headers, record, "Opponent")
 		score := getCellValue(headers, record, "Score")
 
@@ -391,16 +396,16 @@ func parseGoogleSheetGames(r io.Reader) ([]Game, error) {
 			continue
 		}
 
-		// Determine home/away from jersey field
+		// Determine home/away from role field
 		homeAway := ""
-		jerseyLower := strings.ToLower(jersey)
+		roleLower := strings.ToLower(role)
 		switch {
-		case strings.Contains(jerseyLower, "home"),
-			strings.Contains(jerseyLower, "light"):
+		case strings.Contains(roleLower, "home"),
+			strings.Contains(roleLower, "light"):
 			homeAway = "Home"
-		case strings.Contains(jerseyLower, "away"),
-			strings.Contains(jerseyLower, "visitor"),
-			strings.Contains(jerseyLower, "dark"):
+		case strings.Contains(roleLower, "away"),
+			strings.Contains(roleLower, "visitor"),
+			strings.Contains(roleLower, "dark"):
 			homeAway = "Away"
 		}
 
@@ -779,27 +784,42 @@ func formatTime(timeStr string) string {
 	return timeStr
 }
 
-func formatJersey(game *Game, style string) string {
-	jerseyText := "TBD"
+func formatRole(game *Game, style string) string {
+	if cfg.Sport == "volleyball" {
+		if game.HomeAway == "" {
+			return "TBD"
+		}
+		return game.HomeAway
+	}
 
+	// Basketball shows which jersey to wear
+	roleText := "TBD"
 	switch style {
 	case "html":
 		switch game.HomeAway {
 		case "Home":
-			jerseyText = "⬜️"
+			roleText = "⬜️"
 		case "Away":
-			jerseyText = "⬛️"
+			roleText = "⬛️"
 		}
 	case "cal":
 		switch game.HomeAway {
 		case "Home":
-			jerseyText = "Home (Light)"
+			roleText = "Home (Light)"
 		case "Away":
-			jerseyText = "Away (Dark)"
+			roleText = "Away (Dark)"
 		}
 	}
 
-	return jerseyText
+	return roleText
+}
+
+// roleHeader is the schedule column title for the sport's role field
+func roleHeader() string {
+	if cfg.Sport == "volleyball" {
+		return "Role"
+	}
+	return "Jersey"
 }
 
 func convertLinksToHTML(text string) string {
@@ -1113,7 +1133,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 			Game:            game,
 			DisplayDateTime: displayDateTime,
 			LocationHTML:    locationHTML,
-			JerseyText:      formatJersey(game, "html"),
+			RoleText:        formatRole(game, "html"),
 			OpponentDisplay: opponent,
 			ScoreDisplay:    score,
 		})
@@ -1130,6 +1150,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		UpdatedDisplay: nowUTC.Format("1/2/06") + " at " + nowUTC.Format("3:04PM") + " UTC",
 		IsAllTeams:     filterTeam == nil,
 		TeamRecord:     teamRecord,
+		RoleHeader:     roleHeader(),
 		HasGames:       len(gamesToDisplay) > 0,
 		Teams:          teamButtons,
 		ScheduleItems:  templateItems,
@@ -1296,7 +1317,7 @@ func generateICalendar(allGames []Game, allNotes []Note, outputFile string, filt
 			description = game.CourtGymInfo + "\n"
 		}
 
-		description += fmt.Sprintf("Jersey: %s", formatJersey(&game, "cal"))
+		description += fmt.Sprintf("%s: %s", roleHeader(), formatRole(&game, "cal"))
 
 		if game.Score != "" && game.Score != "-" {
 			description += "\nScore: " + game.Score
