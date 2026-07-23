@@ -19,3 +19,6 @@ then add the program and its web dir to `deploy.sh`.
 `go run ./cmd/archive dist/lightning 2025` snapshots the generated site into
 `dist/lightning/2025/` (links rewritten, calendar UI removed). Publish by
 copying that directory to the server web dir once; the cron never touches it.
+Then append the year to `archives` in the program's `config.json` and run
+`./deploy.sh` (the config is embedded in the binary) so live pages link to
+the new archive in their footer.

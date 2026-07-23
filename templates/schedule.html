@@ -150,6 +150,7 @@
       </p>
     </div>
     {{if .Archives}}
+    {{/* no nested divs here: cmd/archive strips this block up to the first </div> */}}
     <div class="seasons">
       <p>
         {{range $i, $year := .Archives}}{{if $i}} | {{end}}<a href="/{{$year}}/">{{$year}}</a>{{end}}
