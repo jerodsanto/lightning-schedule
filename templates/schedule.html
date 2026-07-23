@@ -149,6 +149,13 @@
         >
       </p>
     </div>
+    {{if .Archives}}
+    <div class="seasons">
+      <p>
+        {{range $i, $year := .Archives}}{{if $i}} | {{end}}<a href="/{{$year}}/">{{$year}}</a>{{end}}
+      </p>
+    </div>
+    {{end}}
     <script>
       {{.ScheduleJS}}
     </script>

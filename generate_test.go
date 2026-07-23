@@ -237,3 +237,40 @@ func TestGenerateHTMLWithGames(t *testing.T) {
 		t.Error("expected game opponent in output")
 	}
 }
+
+func TestGenerateHTMLArchiveLinks(t *testing.T) {
+	setupGenerateHTMLTest()
+	cfg.Archives = []string{"2025", "2026"}
+	out := filepath.Join(t.TempDir(), "index.html")
+	if err := generateHTML(nil, nil, out, nil); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	html, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	for _, want := range []string{
+		`<div class="seasons">`,
+		`<a href="/2025/">2025</a>`,
+		`<a href="/2026/">2026</a>`,
+	} {
+		if !strings.Contains(string(html), want) {
+			t.Errorf("expected output to contain %q", want)
+		}
+	}
+}
+
+func TestGenerateHTMLNoArchiveLinks(t *testing.T) {
+	setupGenerateHTMLTest()
+	out := filepath.Join(t.TempDir(), "index.html")
+	if err := generateHTML(nil, nil, out, nil); err != nil {
+		t.Fatalf("generateHTML failed: %v", err)
+	}
+	html, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+	if strings.Contains(string(html), `class="seasons"`) {
+		t.Error("seasons footer should be absent when no archives are configured")
+	}
+}

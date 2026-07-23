@@ -194,6 +194,7 @@ type TemplateData struct {
 	ScheduleItems  []TemplateScheduleItem
 	StylesCSS      template.CSS
 	ScheduleJS     template.JS
+	Archives       []string
 }
 
 // Functions
@@ -1164,6 +1165,7 @@ func generateHTML(allGames []Game, allNotes []Note, outputFile string, filterTea
 		ScheduleItems:  templateItems,
 		StylesCSS:      template.CSS(stylesCSS + "\n" + themeCSS),
 		ScheduleJS:     template.JS(scheduleJS),
+		Archives:       cfg.Archives,
 	}
 
 	// Create output file

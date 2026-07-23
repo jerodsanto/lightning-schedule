@@ -146,6 +146,18 @@ tr.note-row td {
 .calendar a:hover {
   text-decoration: none;
 }
+.seasons {
+  margin: 0 auto 40px auto;
+  text-align: center;
+  font-size: 0.85em;
+}
+.seasons,
+.seasons a {
+  color: #888;
+}
+.seasons a:hover {
+  text-decoration: none;
+}
 
 /* tablets */
 @media (max-width: 768px) {
