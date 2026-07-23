@@ -32,6 +32,7 @@ type ProgramConfig struct {
 	ThemeColor  string            `json:"themeColor"`
 	ICalProdID  string            `json:"icalProdID"`
 	ICalCalName string            `json:"icalCalName"`
+	Archives    []string          `json:"archives"`
 }
 
 //go:embed programs/*/config.json programs/*/theme.css
@@ -53,6 +54,8 @@ func listPrograms(fsys fs.FS) []string {
 	}
 	return names
 }
+
+var archiveYearRegex = regexp.MustCompile(`^\d{4}$`)
 
 func loadProgramConfig(fsys fs.FS, name string) (*ProgramConfig, error) {
 	data, err := fs.ReadFile(fsys, "programs/"+name+"/config.json")
@@ -76,6 +79,11 @@ func loadProgramConfig(fsys fs.FS, name string) (*ProgramConfig, error) {
 	}
 	if c.Sport != "basketball" && c.Sport != "volleyball" {
 		return nil, fmt.Errorf("programs/%s/config.json: sport must be %q or %q, got %q", name, "basketball", "volleyball", c.Sport)
+	}
+	for _, y := range c.Archives {
+		if !archiveYearRegex.MatchString(y) {
+			return nil, fmt.Errorf("programs/%s/config.json: archives entries must be 4-digit years, got %q", name, y)
+		}
 	}
 	return &c, nil
 }

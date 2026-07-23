@@ -12,5 +12,6 @@
   },
   "themeColor": "#fbcb44",
   "icalProdID": "-//Omaha Lightning//Basketball Schedule//EN",
-  "icalCalName": "Lightning Schedule"
+  "icalCalName": "Lightning Schedule",
+  "archives": ["2025"]
 }

@@ -105,6 +105,36 @@ func TestLoadProgramConfigInvalidSport(t *testing.T) {
 	}
 }
 
+func TestLoadProgramConfigArchives(t *testing.T) {
+	c, err := loadProgramConfig(testFS(`{"name": "Test", "sport": "basketball", "domain": "example.com", "sheetID": "abc", "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"}, "archives": ["2025", "2026"]}`), "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Archives) != 2 || c.Archives[0] != "2025" || c.Archives[1] != "2026" {
+		t.Errorf("Archives = %v, want [2025 2026]", c.Archives)
+	}
+}
+
+func TestLoadProgramConfigArchivesOmitted(t *testing.T) {
+	c, err := loadProgramConfig(testFS(validConfigJSON), "test")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(c.Archives) != 0 {
+		t.Errorf("Archives = %v, want empty", c.Archives)
+	}
+}
+
+func TestLoadProgramConfigInvalidArchiveYear(t *testing.T) {
+	_, err := loadProgramConfig(testFS(`{"name": "Test", "sport": "basketball", "domain": "example.com", "sheetID": "abc", "gids": {"schedule": "0", "notes": "1", "locations": "2", "teams": "3"}, "archives": ["25"]}`), "test")
+	if err == nil {
+		t.Fatal("expected error for non-4-digit archive year")
+	}
+	if !strings.Contains(err.Error(), "archives") {
+		t.Errorf("error should mention archives, got: %v", err)
+	}
+}
+
 func TestLoadEmbeddedLightningConfig(t *testing.T) {
 	c, err := loadProgramConfig(programsFS, "lightning")
 	if err != nil {
@@ -116,6 +146,9 @@ func TestLoadEmbeddedLightningConfig(t *testing.T) {
 	if c.Sport != "basketball" {
 		t.Errorf("Sport = %q, want %q", c.Sport, "basketball")
 	}
+	if len(c.Archives) != 1 || c.Archives[0] != "2025" {
+		t.Errorf("Archives = %v, want [2025]", c.Archives)
+	}
 }
 
 func TestLoadEmbeddedWarriorsConfig(t *testing.T) {
@@ -125,6 +158,9 @@ func TestLoadEmbeddedWarriorsConfig(t *testing.T) {
 	}
 	if c.Sport != "volleyball" {
 		t.Errorf("Sport = %q, want %q", c.Sport, "volleyball")
+	}
+	if len(c.Archives) != 0 {
+		t.Errorf("Archives = %v, want empty", c.Archives)
 	}
 }
 
