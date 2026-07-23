@@ -27,6 +27,9 @@ const fixtureHTML = `<!doctype html>
       <p class="instructions">Subscribe to this schedule 👇</p>
       <p><a href="webcal://example.com/schedule.ics">Add to Apple</a></p>
     </div>
+    <div class="seasons">
+      <p><a href="/2024/">2024</a> | <a href="/2025/">2025</a></p>
+    </div>
     <script>
       document.addEventListener("DOMContentLoaded", applyFilters);
       document.addEventListener("DOMContentLoaded", handleTimestamps);
@@ -58,6 +61,8 @@ func TestTransformHTML(t *testing.T) {
 		`webcal://`,
 		`id="onlyUpcoming"`,
 		`document.addEventListener("DOMContentLoaded", applyFilters);`,
+		`<div class="seasons">`,
+		`href="/2024/"`,
 	} {
 		if strings.Contains(out, gone) {
 			t.Errorf("expected %q to be removed", gone)
@@ -78,6 +83,22 @@ func TestTransformHTML(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("expected output to contain %q", want)
 		}
+	}
+}
+
+func TestTransformHTMLNoSeasons(t *testing.T) {
+	noSeasons := strings.Replace(fixtureHTML, `<div class="seasons">
+      <p><a href="/2024/">2024</a> | <a href="/2025/">2025</a></p>
+    </div>`, "", 1)
+	if noSeasons == fixtureHTML {
+		t.Fatal("fixture surgery failed: seasons block not found")
+	}
+	out, err := transformHTML(noSeasons, "2025")
+	if err != nil {
+		t.Fatalf("expected page without seasons footer to transform, got: %v", err)
+	}
+	if strings.Contains(out, `class="seasons"`) {
+		t.Error("no seasons div expected in output")
 	}
 }
 
